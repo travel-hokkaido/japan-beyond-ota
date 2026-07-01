@@ -1765,7 +1765,7 @@ function importJson() {
     if(!data.otas) data.otas = [];
     if(!data.reservations) data.reservations = [];
     mapApiData();
-    localStorage.setItem('jb-ota-data', JSON.stringify(data));
+    saveData();
     closeModal();
     renderAll();
     showPopup('Import OK: ' + (data.reservations||[]).length + ' reservations');
@@ -1900,7 +1900,7 @@ function syncToServer() {
     body: payload
   }).then(function(){
     syncConnected = true;
-    localDirty = false;
+    setTimeout(function(){ localDirty = false; }, 5000);
     renderHeader();
   }).catch(function(err){
     console.error('Sync POST error:', err);

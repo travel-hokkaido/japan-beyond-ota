@@ -1895,9 +1895,10 @@ function syncToServer() {
   });
   fetch(url, {
     method: 'POST',
+    mode: 'no-cors',
     headers: {'Content-Type': 'text/plain'},
     body: payload
-  }).then(function(resp){
+  }).then(function(){
     syncConnected = true;
     localDirty = false;
     renderHeader();

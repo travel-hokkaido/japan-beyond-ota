@@ -701,10 +701,16 @@ function showConfirm(msg, onYes) {
   document.getElementById('popupMsg').textContent = msg;
   var btns = '';
   btns += '<button class="btn btn-outline" onclick="closePopup()">' + t('cancel') + '</button>';
-  btns += '<button class="btn btn-danger" onclick="closePopup();if(window._popupYes)window._popupYes()">' + t('del') + '</button>';
+  btns += '<button class="btn btn-danger" onclick="confirmYes()">' + t('del') + '</button>';
   document.getElementById('popupBtns').innerHTML = btns;
   document.getElementById('popupOverlay').style.display = 'flex';
   window._popupYes = onYes || null;
+}
+
+function confirmYes() {
+  var fn = window._popupYes;
+  closePopup();
+  if(fn) fn();
 }
 
 function closePopup() {

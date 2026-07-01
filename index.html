@@ -103,6 +103,7 @@ td{padding:10px 12px;border-bottom:1px solid var(--border-light);white-space:now
 tr.clickable{cursor:pointer;transition:background .15s}
 tr.clickable:hover{background:var(--accent-bg)}
 tr.past-res{opacity:.45}
+tr.cancelled-res td{background:#FEF2F2;color:#991B1B}
 
 /* === STATUS BADGES === */
 .status-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;display:inline-block}
@@ -1238,7 +1239,8 @@ function renderResList() {
   }
   res.forEach(function(r){
     var isPast = r.date < todayS;
-    h += '<tr class="clickable' + (isPast?' past-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
+    var isCancelled = r.status === 'cancelled';
+    h += '<tr class="clickable' + (isPast?' past-res':'') + (isCancelled?' cancelled-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
     h += '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + getOtaColor(r.otaId) + ';margin-right:6px"></span>' + escHtml(getOtaName(r.otaId)) + '</td>';
     h += '<td>' + escHtml(r.bookingNo) + '</td>';
     h += '<td>' + escHtml(r.guest);
@@ -1980,7 +1982,10 @@ function renderAll() {
 function init() {
   loadData();
   renderAll();
-  if(getSyncUrl()) startPolling();
+  if(getSyncUrl()) {
+    doSync();
+    startPolling();
+  }
 }
 
 init();

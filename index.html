@@ -96,10 +96,10 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-seri
 .view-toggle .vt-btn.active{background:var(--accent);color:#fff}
 
 /* === TABLE === */
-.table-wrap{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:var(--bg);padding:10px 14px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
-td{padding:10px 14px;border-bottom:1px solid var(--border-light);white-space:nowrap}
+.table-wrap{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{background:var(--bg);padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+td{padding:10px 12px;border-bottom:1px solid var(--border-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 tr.clickable{cursor:pointer;transition:background .15s}
 tr.clickable:hover{background:var(--accent-bg)}
 tr.past-res{opacity:.45}
@@ -437,6 +437,7 @@ var showPastRes = false;
 var chartInstances = [];
 var syncInterval = null;
 var syncConnected = false;
+var localDirty = false;
 
 var OTA_COLORS = ['#4A90D9','#FF6B35','#2D9B4E','#9B59B6','#E74C3C','#1ABC9C','#F39C12','#34495E'];
 
@@ -476,10 +477,6 @@ function loadData() {
   if (stored) {
     try {
       data = JSON.parse(stored);
-      if (data.reservations && data.reservations.length > 0 && data.reservations[0].id === 'res001') {
-        data.reservations = [];
-        localStorage.setItem('jb-ota-data', JSON.stringify(data));
-      }
     } catch(e) { data = getDefaultData(); }
   } else {
     data = getDefaultData();
@@ -491,6 +488,7 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem('jb-ota-data', JSON.stringify(data));
+  localDirty = true;
   try { syncToServer(); } catch(e) {}
 }
 
@@ -721,6 +719,7 @@ function renderHeader() {
   var dotTitle = syncConnected ? t('connected') : t('disconnected');
   var h = '';
   h += '<div class="header">';
+  h += '<a href="https://travel-hokkaido.github.io/Document-Management/" style="display:flex;align-items:center;text-decoration:none;color:var(--text2);margin-right:6px" title="Home"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>';
   h += '<div class="header-logo">' + t('appTitle') + ' <span>OTA</span></div>';
   h += '<div class="header-right">';
   h += '<select class="lang-select" onchange="changeLang(this.value)">';
@@ -1175,7 +1174,6 @@ function renderResTab() {
   h += '</div>';
   h += '<button class="btn btn-sm' + (showPastRes?' btn-accent':' btn-outline') + '" onclick="togglePastRes()">' + t('showPast') + '</button>';
   h += '<button class="btn btn-outline btn-sm" onclick="exportCsv()">' + t('csvExport') + '</button>';
-  h += '<button class="btn btn-outline btn-sm" onclick="showEmailParser()">' + t('parseEmail') + '</button>';
   h += '<button class="btn btn-accent btn-sm" onclick="showResForm(null)">' + t('addReservation') + '</button>';
   h += '</div>';
 
@@ -1214,9 +1212,9 @@ function getFilteredRes() {
 
 function renderResList() {
   var res = getFilteredRes();
-  var repeaters = getRepeaters();
   var todayS = todayStr();
   var h = '<div class="table-wrap"><table>';
+  h += '<colgroup><col style="width:10%"><col style="width:12%"><col style="width:14%"><col style="width:18%"><col style="width:10%"><col style="width:6%"><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>';
   h += '<thead><tr>';
   h += '<th>' + t('ota') + '</th>';
   h += '<th>' + t('bookingNo') + '</th>';
@@ -1237,7 +1235,6 @@ function renderResList() {
     h += '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + getOtaColor(r.otaId) + ';margin-right:6px"></span>' + escHtml(getOtaName(r.otaId)) + '</td>';
     h += '<td>' + escHtml(r.bookingNo) + '</td>';
     h += '<td>' + escHtml(r.guest);
-    if(repeaters[(r.guest||'').trim().toLowerCase()]) h += '<span class="badge-repeater">' + t('repeater') + '</span>';
     h += '</td>';
     h += '<td>' + escHtml(r.tour) + '</td>';
     h += '<td>' + escHtml(r.date) + '</td>';
@@ -1542,127 +1539,6 @@ function onTourChange() {
   autoCalcPrice();
 }
 
-/* ===== GEMINI EMAIL PARSER ===== */
-function saveGeminiKey() {
-  var key = document.getElementById('gemini-key').value.trim();
-  localStorage.setItem('jb-gemini-key', key);
-  closeModal();
-  showPopup(t('save') + ' OK');
-}
-
-function showEmailParser() {
-  var gkey = getGeminiKey();
-  if(!gkey) { showSyncSettings(); return; }
-  var h = '';
-  h += '<div class="modal-header"><h2>' + t('parseEmail') + '</h2>';
-  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
-  h += '<div class="modal-body">';
-  h += formGroup(t('pasteEmail'), '<textarea id="email-body" rows="10" placeholder="' + t('emailPlaceholder') + '" style="font-size:12px"></textarea>');
-  h += '<div id="parseStatus" style="display:none;text-align:center;padding:16px;color:var(--text2)"></div>';
-  h += '<div class="form-actions">';
-  h += '<button type="button" class="btn btn-outline" onclick="closeModal()">' + t('cancel') + '</button>';
-  h += '<button type="button" class="btn btn-accent" id="parseBtn" onclick="parseEmailWithGemini()">' + t('parseEmail') + '</button>';
-  h += '</div></div>';
-  showModal(h, false);
-}
-
-function parseEmailWithGemini() {
-  var body = document.getElementById('email-body').value.trim();
-  if(!body) return;
-  var gkey = getGeminiKey();
-  if(!gkey) { showPopup('Gemini API Key not set'); return; }
-
-  var btn = document.getElementById('parseBtn');
-  var status = document.getElementById('parseStatus');
-  btn.disabled = true;
-  btn.textContent = t('parsing');
-  status.style.display = 'block';
-  status.textContent = t('parsing');
-
-  var prompt = 'You are an OTA booking email parser for Japan Beyond, a tour company in Hokkaido.\n';
-  prompt += 'Extract fields and return ONLY valid JSON (no markdown, no explanation):\n';
-  prompt += '{"ota":"","resNo":"","guest":"","tour":"","date":"YYYY-MM-DD","vehicle":"","price":0,"pax":0,"carSeat":0,"pickup":"","dropoff":"","status":"confirmed","memo":"","pickupTime":"HH:MM"}\n';
-  prompt += 'Rules: empty string for missing text, 0 for missing numbers. Detect OTA from email content or sender domain. Email may be in KO/JA/EN/FR or any language.\n';
-  prompt += 'Extract pickup time if mentioned (format HH:MM). Put remaining useful info in memo.\n\n';
-  prompt += 'Email:\n' + body;
-
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + gkey;
-
-  fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      contents: [{parts: [{text: prompt}]}],
-      generationConfig: {temperature: 0.1, maxOutputTokens: 1024}
-    })
-  })
-  .then(function(resp) { return resp.json(); })
-  .then(function(json) {
-    var text = json.candidates[0].content.parts[0].text;
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    var parsed = JSON.parse(text);
-    closeModal();
-    applyParsedReservation(parsed);
-  })
-  .catch(function(err) {
-    status.textContent = 'Error: ' + err.message;
-    btn.disabled = false;
-    btn.textContent = t('parseEmail');
-  });
-}
-
-function applyParsedReservation(parsed) {
-  var otas = data.otas || [];
-  var otaId = '';
-  var otaName = (parsed.ota || '').toLowerCase();
-  for(var i=0;i<otas.length;i++){
-    if(otas[i].name.toLowerCase() === otaName) { otaId = otas[i].id; break; }
-  }
-
-  var r = {
-    id: genId(),
-    otaId: otaId,
-    bookingNo: parsed.resNo || '',
-    guest: parsed.guest || '',
-    tour: parsed.tour || '',
-    date: parsed.date || '',
-    pickupTime: parsed.pickupTime || '',
-    vehicle: parsed.vehicle || '',
-    price: 0,
-    pax: parseInt(parsed.pax) || 0,
-    carSeat: parseInt(parsed.carSeat) || 0,
-    pickup: parsed.pickup || '',
-    dropoff: parsed.dropoff || '',
-    email: parsed.email || '',
-    phone: parsed.phone || '',
-    status: parsed.status || 'confirmed',
-    notes: parsed.memo || '',
-    driver: '',
-    driverPhone: ''
-  };
-
-  var calc = matchProductPrice(otaId, r.tour, r.vehicle);
-  if(calc) r.price = calc.net;
-
-  if(!data.reservations) data.reservations = [];
-
-  var exists = false;
-  if(r.bookingNo) {
-    for(var i=0;i<data.reservations.length;i++){
-      if(data.reservations[i].bookingNo === r.bookingNo) { exists = true; break; }
-    }
-  }
-  if(exists) {
-    showPopup(t('bookingNo') + ' ' + r.bookingNo + ' — already exists');
-    return;
-  }
-
-  data.reservations.push(r);
-  saveData();
-  renderMain();
-  showPopup(r.guest + ' / ' + r.tour + ' — OK');
-}
-
 /* ===== CSV EXPORT ===== */
 function exportCsv() {
   var res = getFilteredRes();
@@ -1850,23 +1726,17 @@ function createChart(canvasId, type, chartData, chartOptions) {
 
 /* ===== SYNC ===== */
 var DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwQ-ZfnH-gcBUzoJ4JBshtoAoHE2-5O_ey-GEzLUOPkBurT4cm3ERhYS2IxZWJJnVP8/exec';
-var DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6Ln7C5WUMsRTycDPtzjrkTAg_2TYInb20DefdI7g55rBw';
 function getSyncUrl() { return localStorage.getItem('jb-sync-url') || DEFAULT_SYNC_URL; }
-function getGeminiKey() { return localStorage.getItem('jb-gemini-key') || DEFAULT_GEMINI_KEY; }
 function setSyncUrl(url) { localStorage.setItem('jb-sync-url', url); }
 
 function showSyncSettings() {
   var url = getSyncUrl();
-  var gkey = getGeminiKey();
   var h = '';
   h += '<div class="modal-header"><h2>' + t('syncSettings') + '</h2>';
   h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
   h += '<div class="modal-body">';
   h += formGroup(t('webAppUrl'), '<input id="sync-url" value="' + escHtml(url) + '" placeholder="https://script.google.com/...">');
   h += '<button class="btn btn-accent btn-sm" onclick="saveSyncUrl()" style="margin-bottom:20px">' + t('saveUrl') + '</button>';
-  h += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">';
-  h += formGroup(t('geminiKey'), '<input id="gemini-key" type="password" value="' + escHtml(gkey) + '" placeholder="AIza...">');
-  h += '<button class="btn btn-accent btn-sm" onclick="saveGeminiKey()" style="margin-bottom:20px">' + t('save') + '</button>';
   h += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">';
   h += '<div style="font-weight:700;margin-bottom:8px">' + t('manualImport') + '</div>';
   h += formGroup('', '<textarea id="sync-json" rows="6" placeholder="' + t('pasteJson') + '"></textarea>');
@@ -1953,20 +1823,16 @@ function mapApiData() {
 
 function mergeServerReservations(serverRes) {
   var existing = data.reservations || [];
-  var existingByNo = {};
-  existing.forEach(function(r){ if(r.bookingNo) existingByNo[r.bookingNo] = r; });
-  var merged = existing.slice();
+  var serverByNo = {};
   serverRes.forEach(function(sr){
     var key = sr.resNo || sr.bookingNo || '';
-    if(key && existingByNo[key]) {
-      var ex = existingByNo[key];
-      if(sr.status) ex.status = sr.status;
-      if(sr.memo !== undefined) ex.notes = sr.memo || sr.notes || ex.notes;
-    } else {
-      merged.push(sr);
-    }
+    if(key) serverByNo[key] = true;
   });
-  return merged;
+  var localOnly = existing.filter(function(r){
+    var key = r.bookingNo || '';
+    return key && !serverByNo[key];
+  });
+  return serverRes.concat(localOnly);
 }
 
 function doSync() {
@@ -1980,15 +1846,15 @@ function doSync() {
       return resp.json();
     })
     .then(function(json){
-      if(json.otas) data.otas = json.otas;
       if(json.reservations) {
         data.reservations = mergeServerReservations(json.reservations);
+        mapApiData();
       }
       if(!data.otas) data.otas = [];
       if(!data.reservations) data.reservations = [];
-      mapApiData();
       localStorage.setItem('jb-ota-data', JSON.stringify(data));
       syncConnected = true;
+      localDirty = false;
       renderAll();
     })
     .catch(function(err){
@@ -2001,10 +1867,31 @@ function doSync() {
 function syncToServer() {
   var url = getSyncUrl();
   if(!url) return;
+  var resForServer = (data.reservations || []).map(function(r){
+    return {
+      id: r.id || '',
+      ota: getOtaName(r.otaId) || r.otaId || '',
+      resNo: r.bookingNo || '',
+      guest: r.guest || '',
+      tour: r.tour || '',
+      date: r.date || '',
+      vehicle: r.vehicle || '',
+      price: r.price || 0,
+      pax: r.pax || 0,
+      carSeat: r.carSeat || 0,
+      pickup: r.pickup || '',
+      dropoff: r.dropoff || '',
+      status: r.status || 'confirmed',
+      memo: r.notes || '',
+      pickupTime: r.pickupTime || '',
+      driver: r.driver || '',
+      driverPhone: r.driverPhone || ''
+    };
+  });
   var payload = JSON.stringify({
     action: 'saveAll',
     otas: data.otas || [],
-    reservations: data.reservations || []
+    reservations: resForServer
   });
   fetch(url, {
     method: 'POST',
@@ -2012,6 +1899,7 @@ function syncToServer() {
     redirect: 'follow'
   }).then(function(resp){
     syncConnected = true;
+    localDirty = false;
     renderHeader();
   }).catch(function(err){
     console.error('Sync POST error:', err);
@@ -2023,6 +1911,7 @@ function startPolling() {
   var url = getSyncUrl();
   if(!url) return;
   syncInterval = setInterval(function(){
+    if(localDirty) return;
     var u = getSyncUrl();
     if(!u) { stopPolling(); return; }
     fetch(u, {redirect:'follow'})
@@ -2031,16 +1920,23 @@ function startPolling() {
         return resp.json();
       })
       .then(function(json){
-        if(json.otas) data.otas = json.otas;
+        if(localDirty) return;
+        var oldHash = JSON.stringify(data.reservations || []);
         if(json.reservations) {
           data.reservations = mergeServerReservations(json.reservations);
+          mapApiData();
         }
         if(!data.otas) data.otas = [];
         if(!data.reservations) data.reservations = [];
-        mapApiData();
+        var newHash = JSON.stringify(data.reservations);
         localStorage.setItem('jb-ota-data', JSON.stringify(data));
+        var wasConnected = syncConnected;
         syncConnected = true;
-        renderAll();
+        if(newHash !== oldHash) {
+          renderAll();
+        } else if(!wasConnected) {
+          renderHeader();
+        }
       })
       .catch(function(err){
         syncConnected = false;

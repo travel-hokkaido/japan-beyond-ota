@@ -1859,6 +1859,7 @@ function doSync() {
       return resp.json();
     })
     .then(function(json){
+      if(json.otas && json.otas.length > 0) data.otas = json.otas;
       if(json.reservations) {
         data.reservations = mergeServerReservations(json.reservations);
         mapApiData();
@@ -1935,14 +1936,15 @@ function startPolling() {
       })
       .then(function(json){
         if(localDirty) return;
-        var oldHash = JSON.stringify(data.reservations || []);
+        var oldHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
+        if(json.otas && json.otas.length > 0) data.otas = json.otas;
         if(json.reservations) {
           data.reservations = mergeServerReservations(json.reservations);
           mapApiData();
         }
         if(!data.otas) data.otas = [];
         if(!data.reservations) data.reservations = [];
-        var newHash = JSON.stringify(data.reservations);
+        var newHash = JSON.stringify(data.reservations) + JSON.stringify(data.otas);
         localStorage.setItem('jb-ota-data', JSON.stringify(data));
         var wasConnected = syncConnected;
         syncConnected = true;

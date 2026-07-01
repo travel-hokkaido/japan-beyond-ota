@@ -97,7 +97,7 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-seri
 
 /* === TABLE === */
 .table-wrap{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow:hidden}
-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:var(--bg);padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
 td{padding:10px 12px;border-bottom:1px solid var(--border-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 tr.clickable{cursor:pointer;transition:background .15s}
@@ -275,7 +275,7 @@ var LANG = {
     confirmed: '確定', pending: '保留', cancelled: 'キャンセル', completed: '完了',
     priceField: '料金(¥)', pax: '人数', carSeat: 'チャイルドシート',
     pickup: 'ピックアップ', dropoff: 'ドロップオフ',
-    pickupTime: 'ピックアップ時間',
+    pickupTime: '時間',
     email: 'メール', phone: '電話番号', notes: 'メモ',
     repeater: 'リピーター', deleteRes: '予約削除',
     editReservation: '予約編集', addNewReservation: '新規予約追加',
@@ -333,7 +333,7 @@ var LANG = {
     confirmed: '확정', pending: '보류', cancelled: '취소', completed: '완료',
     priceField: '가격(¥)', pax: '인원', carSeat: '카시트',
     pickup: '픽업', dropoff: '드롭',
-    pickupTime: '픽업 시간',
+    pickupTime: '시간',
     email: '이메일', phone: '전화번호', notes: '메모',
     repeater: '리피터', deleteRes: '예약 삭제',
     editReservation: '예약 수정', addNewReservation: '새 예약 추가',
@@ -391,7 +391,7 @@ var LANG = {
     confirmed: 'Confirmed', pending: 'Pending', cancelled: 'Cancelled', completed: 'Completed',
     priceField: 'Price (¥)', pax: 'Guests', carSeat: 'Car Seat',
     pickup: 'Pickup', dropoff: 'Drop-off',
-    pickupTime: 'Pickup Time',
+    pickupTime: 'Time',
     email: 'Email', phone: 'Phone', notes: 'Notes',
     repeater: 'Repeater', deleteRes: 'Delete Booking',
     editReservation: 'Edit Booking', addNewReservation: 'Add New Booking',
@@ -1274,7 +1274,7 @@ function renderResList() {
   var res = getFilteredRes();
   var todayS = todayStr();
   var h = '<div class="table-wrap"><table>';
-  h += '<colgroup><col style="width:10%"><col style="width:12%"><col style="width:14%"><col style="width:18%"><col style="width:10%"><col style="width:6%"><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>';
+  h += '<colgroup><col style="width:8%"><col style="width:11%"><col style="width:13%"><col style="width:17%"><col style="width:9%"><col style="width:6%"><col style="width:10%"><col style="width:12%"><col style="width:8%"></colgroup>';
   h += '<thead><tr>';
   h += '<th>' + t('ota') + '</th>';
   h += '<th>' + t('bookingNo') + '</th>';

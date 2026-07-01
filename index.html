@@ -438,6 +438,7 @@ var chartInstances = [];
 var syncInterval = null;
 var syncConnected = false;
 var localDirty = false;
+var deletedBookingNos = [];
 
 var OTA_COLORS = ['#4A90D9','#FF6B35','#2D9B4E','#9B59B6','#E74C3C','#1ABC9C','#F39C12','#34495E'];
 
@@ -1433,7 +1434,14 @@ function saveRes(e, resId) {
 
 function deleteRes(resId) {
   showConfirm(t('confirmDel'), function(){
-    data.reservations = (data.reservations||[]).filter(function(r){return r.id!==resId;});
+    var res = data.reservations || [];
+    for(var i=0;i<res.length;i++){
+      if(res[i].id===resId && res[i].bookingNo) {
+        deletedBookingNos.push(res[i].bookingNo);
+        break;
+      }
+    }
+    data.reservations = res.filter(function(r){return r.id!==resId;});
     saveData();
     closeModal();
     renderMain();
@@ -1806,13 +1814,20 @@ function mapApiData() {
     if(!r.email) r.email = '';
     if(!r.phone) r.phone = '';
     if(!r.status) r.status = 'confirmed';
+    var ptRegex = /,?\s*[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*\d{1,2}[:\.]?\d{2}\s*,?/;
     if(!r.pickupTime && r.notes) {
       var tm = (r.notes||'').match(/[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*(\d{1,2}[:\.]?\d{2})/);
-      if(tm) r.pickupTime = tm[1].replace('.', ':');
+      if(tm) {
+        r.pickupTime = tm[1].replace('.', ':');
+        r.notes = r.notes.replace(ptRegex, '').trim();
+      }
     }
     if(!r.pickupTime && r.memo) {
       var tm2 = (r.memo||'').match(/[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*(\d{1,2}[:\.]?\d{2})/);
-      if(tm2) r.pickupTime = tm2[1].replace('.', ':');
+      if(tm2) {
+        r.pickupTime = tm2[1].replace('.', ':');
+        r.memo = r.memo.replace(ptRegex, '').trim();
+      }
     }
     if(!r.price || r.price === 0) {
       var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
@@ -1823,16 +1838,20 @@ function mapApiData() {
 
 function mergeServerReservations(serverRes) {
   var existing = data.reservations || [];
+  var filtered = serverRes.filter(function(sr){
+    var key = sr.resNo || sr.bookingNo || '';
+    return deletedBookingNos.indexOf(key) < 0;
+  });
   var serverByNo = {};
-  serverRes.forEach(function(sr){
+  filtered.forEach(function(sr){
     var key = sr.resNo || sr.bookingNo || '';
     if(key) serverByNo[key] = true;
   });
   var localOnly = existing.filter(function(r){
     var key = r.bookingNo || '';
-    return key && !serverByNo[key];
+    return key && !serverByNo[key] && deletedBookingNos.indexOf(key) < 0;
   });
-  return serverRes.concat(localOnly);
+  return filtered.concat(localOnly);
 }
 
 function doSync() {

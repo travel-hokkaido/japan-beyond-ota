@@ -854,28 +854,17 @@ function showOtaDetail(otaId) {
     h += '<div style="text-align:center;color:var(--text2);padding:20px">' + t('noData') + '</div>';
   }
   prods.forEach(function(p, idx){
-    h += '<div class="product-item">';
-    h += '<div class="product-actions">';
-    h += '<button class="btn btn-sm btn-outline" onclick="showProductForm(\'' + otaId + '\',\'' + p.id + '\')">' + t('edit') + '</button>';
-    h += '<button class="btn btn-sm btn-danger" onclick="deleteProduct(\'' + otaId + '\',\'' + p.id + '\')">' + t('del') + '</button>';
-    h += '</div>';
-    h += '<h4>' + escHtml(p.name) + '</h4>';
-    if(p.url) h += '<a class="product-url" href="' + escHtml(p.url) + '" target="_blank">' + escHtml(p.url) + '</a><br>';
     var stColor = p.status==='published'?'#2D9B4E':'#888';
     var stBg = p.status==='published'?'#e8f5e9':'#eee';
+    h += '<div class="product-item" style="cursor:pointer" onclick="showProductDetail(\'' + otaId + '\',\'' + p.id + '\')">';
+    h += '<div class="product-actions">';
+    h += '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();copyProduct(\'' + otaId + '\',\'' + p.id + '\')">Copy</button>';
+    h += '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showProductForm(\'' + otaId + '\',\'' + p.id + '\')">' + t('edit') + '</button>';
+    h += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteProduct(\'' + otaId + '\',\'' + p.id + '\')">' + t('del') + '</button>';
+    h += '</div>';
+    h += '<h4>' + escHtml(p.name) + '</h4>';
     h += '<span class="product-status" style="background:' + stBg + ';color:' + stColor + '">';
     h += (p.status==='published'?t('published'):t('unpublished')) + '</span>';
-    var pComm = p.commission !== undefined ? p.commission : (o ? o.commission : 20);
-    h += ' <span style="font-size:11px;color:var(--text2);margin-left:6px">' + t('commission') + ' ' + pComm + '%</span>';
-    var opts = p.options || [];
-    if(opts.length>0){
-      h += '<div style="margin-top:8px;font-size:12px;color:var(--text2)">';
-      opts.forEach(function(op){
-        var net = Math.round(op.price * (100 - pComm) / 100);
-        h += '<span style="margin-right:14px">' + escHtml(op.name) + ': ' + fmtYen(op.price) + ' → <span style="color:var(--accent);font-weight:600">' + fmtYen(net) + '</span></span>';
-      });
-      h += '</div>';
-    }
     h += '</div>';
   });
   h += '</div>';
@@ -894,6 +883,49 @@ function togglePw(pw) {
 }
 
 /* ===== PRODUCT FORM ===== */
+function showProductDetail(otaId, productId) {
+  var o = getOta(otaId);
+  if(!o) return;
+  var p = null;
+  var prods = o.products || [];
+  for(var i=0;i<prods.length;i++){ if(prods[i].id===productId){p=prods[i];break;} }
+  if(!p) return;
+  var pComm = p.commission !== undefined ? p.commission : (o ? o.commission : 20);
+  var h = '';
+  h += '<div class="modal-header"><h2>' + escHtml(p.name) + '</h2>';
+  h += '<button class="modal-close" onclick="showOtaDetail(\'' + otaId + '\')">&times;</button></div>';
+  h += '<div class="modal-body">';
+  var stColor = p.status==='published'?'#2D9B4E':'#888';
+  var stBg = p.status==='published'?'#e8f5e9':'#eee';
+  h += '<span class="product-status" style="background:' + stBg + ';color:' + stColor + '">';
+  h += (p.status==='published'?t('published'):t('unpublished')) + '</span>';
+  h += ' <span style="font-size:12px;color:var(--text2);margin-left:8px">' + t('commission') + ' ' + pComm + '%</span>';
+  if(p.url) {
+    h += '<div style="margin-top:12px">';
+    h += '<a href="' + escHtml(p.url) + '" target="_blank" style="color:var(--accent);font-size:13px;word-break:break-all">' + escHtml(p.url) + '</a>';
+    h += '</div>';
+  }
+  var opts = p.options || [];
+  if(opts.length > 0) {
+    h += '<div style="margin-top:16px">';
+    h += '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">' + t('options') + '</div>';
+    opts.forEach(function(op){
+      var net = Math.round(op.price * (100 - pComm) / 100);
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg);border:1px solid var(--border-light);border-radius:8px;margin-bottom:6px">';
+      h += '<span style="font-weight:600">' + escHtml(op.name) + '</span>';
+      h += '<span>' + t('grossPrice') + ' ' + fmtYen(op.price) + ' → <span style="color:var(--accent);font-weight:700">' + t('netPrice') + ' ' + fmtYen(net) + '</span></span>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  h += '<div class="form-actions" style="margin-top:20px">';
+  h += '<button class="btn btn-outline" onclick="showOtaDetail(\'' + otaId + '\')">' + t('close') + '</button>';
+  h += '<button class="btn btn-outline" onclick="copyProduct(\'' + otaId + '\',\'' + p.id + '\');showOtaDetail(\'' + otaId + '\')">Copy</button>';
+  h += '<button class="btn btn-accent" onclick="showProductForm(\'' + otaId + '\',\'' + p.id + '\')">' + t('edit') + '</button>';
+  h += '</div></div>';
+  showModal(h, false);
+}
+
 function showProductForm(otaId, productId) {
   var o = getOta(otaId);
   if(!o) return;
@@ -1057,6 +1089,26 @@ function deleteProduct(otaId, productId) {
     saveData();
     showOtaDetail(otaId);
   });
+}
+
+function copyProduct(otaId, productId) {
+  var o = getOta(otaId);
+  if(!o) return;
+  var prods = o.products || [];
+  var src = null;
+  for(var i=0;i<prods.length;i++){ if(prods[i].id===productId){src=prods[i];break;} }
+  if(!src) return;
+  var copy = {
+    id: genId(),
+    name: src.name + ' (Copy)',
+    url: src.url || '',
+    status: src.status || 'published',
+    commission: src.commission,
+    options: (src.options||[]).map(function(op){ return {name:op.name, price:op.price}; })
+  };
+  o.products.push(copy);
+  saveData();
+  showOtaDetail(otaId);
 }
 
 /* ===== ADD / EDIT OTA ===== */

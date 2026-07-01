@@ -1843,21 +1843,7 @@ function mapApiData() {
 }
 
 function mergeServerReservations(serverRes) {
-  var existing = data.reservations || [];
-  var filtered = serverRes.filter(function(sr){
-    var key = sr.resNo || sr.bookingNo || '';
-    return deletedBookingNos.indexOf(key) < 0;
-  });
-  var serverByNo = {};
-  filtered.forEach(function(sr){
-    var key = sr.resNo || sr.bookingNo || '';
-    if(key) serverByNo[key] = true;
-  });
-  var localOnly = existing.filter(function(r){
-    var key = r.bookingNo || '';
-    return key && !serverByNo[key] && deletedBookingNos.indexOf(key) < 0;
-  });
-  return filtered.concat(localOnly);
+  return serverRes;
 }
 
 function doSync() {

@@ -1895,8 +1895,8 @@ function syncToServer() {
   });
   fetch(url, {
     method: 'POST',
-    body: payload,
-    redirect: 'follow'
+    headers: {'Content-Type': 'text/plain'},
+    body: payload
   }).then(function(resp){
     syncConnected = true;
     localDirty = false;

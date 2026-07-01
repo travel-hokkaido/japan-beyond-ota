@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Japan Beyond OTA</title>
+<script src="https://artifactcdn.diabrowser.engineering/ajax/libs/Chart.js/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#FAF8F5;--card:#FFFFFF;
+  --accent:#C45D3E;--accent-hover:#E8735A;--accent-bg:rgba(196,93,62,0.08);
+  --text:#2D2A26;--text2:#7A7570;
+  --border:#E8E4DF;--border-light:#F0ECE8;
+  --radius:12px;--radius-sm:8px;
+  --shadow:0 1px 3px rgba(0,0,0,0.04);
+  --st-confirmed:#3A8A5C;--st-pending:#D4973B;--st-cancelled:#C44D3E;--st-completed:#4A7FB5;
+}
+body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* === HEADER === */
+.header{background:var(--card);height:60px;border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
+.header-logo{font-size:20px;font-weight:700;color:var(--accent);white-space:nowrap}
+.header-logo span{font-weight:400;color:var(--text);font-size:20px;margin-left:1px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lang-select{padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card);font-size:13px;cursor:pointer;color:var(--text);transition:border-color .2s}
+.lang-select:focus{outline:none;border-color:var(--accent)}
+
+/* === BUTTONS === */
+.btn{padding:10px 20px;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all .2s;line-height:1}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent-hover)}
+.btn-outline{background:var(--bg);border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-danger{background:#FEF2F2;color:var(--st-cancelled);border:1px solid #FECACA}
+.btn-danger:hover{background:#FEE2E2;color:#991B1B}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sync-dot.connected{background:var(--st-confirmed)}
+.sync-dot.disconnected{background:#ccc}
+
+/* === TABS === */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;background:var(--card)}
+.tab{padding:14px 24px;font-size:14px;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* === MAIN === */
+.main{padding:24px;max-width:1200px;margin:0 auto;padding-bottom:72px}
+
+/* === SUMMARY CARDS === */
+.summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.summary-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:20px;text-align:center}
+.summary-card .value{font-size:28px;font-weight:700;color:var(--accent)}
+.summary-card .label{font-size:12px;color:var(--text2);margin-top:6px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.summary-card .sub{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* === OTA GRID === */
+.ota-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.ota-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:0;cursor:pointer;position:relative;transition:transform .2s,box-shadow .2s;overflow:hidden}
+.ota-card .ota-color-bar{height:4px;width:100%}
+.ota-card .ota-card-body{padding:20px}
+.ota-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.08)}
+.ota-card .hover-btns{position:absolute;top:12px;right:12px;display:flex;gap:4px;opacity:0;transition:opacity .2s}
+.ota-card:hover .hover-btns{opacity:1}
+.ota-card h3{font-size:18px;font-weight:700;margin-bottom:4px}
+.ota-card .ota-meta{font-size:13px;color:var(--text2);margin-bottom:14px}
+.ota-card .ota-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ota-card .ota-stat{text-align:center;padding:10px 8px;background:var(--bg);border-radius:var(--radius-sm)}
+.ota-card .ota-stat .num{font-size:22px;font-weight:700;color:var(--accent)}
+.ota-card .ota-stat .lbl{font-size:11px;color:var(--text2);margin-top:2px}
+.ota-card-add{background:var(--card);border-radius:var(--radius);border:2px dashed var(--border);padding:20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:180px;transition:all .2s}
+.ota-card-add:hover{border-color:var(--accent);background:var(--accent-bg)}
+.ota-card-add .plus{font-size:36px;color:var(--accent);margin-bottom:8px;line-height:1}
+.ota-card-add .label{font-size:14px;color:var(--text2);font-weight:600}
+
+/* === ALERT === */
+.alert-banner{background:#FFF3CD;border:1px solid #FFE082;border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:16px;font-size:13px;color:#856404;display:flex;align-items:center;gap:8px}
+.alert-banner .alert-icon{width:20px;height:20px;border-radius:50%;background:#D4973B;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* === TOOLBAR === */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.search-input{padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;min-width:220px;background:var(--card);transition:border-color .2s,box-shadow .2s}
+.search-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(196,93,62,0.1)}
+
+/* === FILTER CHIPS === */
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:6px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--card);transition:all .2s}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* === VIEW TOGGLE === */
+.view-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.view-toggle .vt-btn{padding:8px 16px;font-size:12px;border:none;background:var(--card);cursor:pointer;font-weight:600;color:var(--text2);transition:all .2s}
+.view-toggle .vt-btn:hover{color:var(--text)}
+.view-toggle .vt-btn.active{background:var(--accent);color:#fff}
+
+/* === TABLE === */
+.table-wrap{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg);padding:10px 14px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+td{padding:10px 14px;border-bottom:1px solid var(--border-light);white-space:nowrap}
+tr.clickable{cursor:pointer;transition:background .15s}
+tr.clickable:hover{background:var(--accent-bg)}
+tr.past-res{opacity:.45}
+
+/* === STATUS BADGES === */
+.status-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;display:inline-block}
+.status-badge.st-confirmed{background:#ECFDF5;color:#065F46}
+.status-badge.st-pending{background:#FFFBEB;color:#92400E}
+.status-badge.st-cancelled{background:#FEF2F2;color:#991B1B}
+.status-badge.st-completed{background:#EFF6FF;color:#1E40AF}
+.badge-repeater{padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:var(--accent-bg);color:var(--accent);margin-left:6px}
+
+/* === CALENDAR === */
+.calendar{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:20px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cal-nav .month-label{font-size:18px;font-weight:700}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border)}
+.cal-header{background:var(--bg);padding:8px;text-align:center;font-size:12px;font-weight:700;color:var(--text2)}
+.cal-cell{background:var(--card);min-height:80px;padding:4px;vertical-align:top;position:relative}
+.cal-cell.empty{background:#f8f6f3}
+.cal-cell.today{background:#FFF8F0}
+.cal-day{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:2px}
+.cal-event{font-size:10px;padding:2px 5px;border-radius:4px;color:#fff;margin-bottom:2px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:opacity .2s}
+.cal-event:hover{opacity:.8}
+
+/* === MODAL === */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;justify-content:center;align-items:flex-start;padding:40px 16px;overflow-y:auto}
+.modal-box{background:var(--card);border-radius:16px;width:100%;max-width:720px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);margin:auto}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1;border-radius:16px 16px 0 0}
+.modal-header h2{font-size:18px;font-weight:700}
+.modal-close{background:var(--bg);border:1px solid var(--border-light);width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;transition:all .2s;padding:0;line-height:1}
+.modal-close:hover{background:var(--border-light);color:var(--text)}
+.modal-body{padding:24px}
+
+/* === FORM === */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--card);color:var(--text);transition:border-color .2s,box-shadow .2s;font-family:inherit}
+.form-group textarea{min-height:60px;resize:vertical}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(196,93,62,0.1)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:24px;flex-wrap:wrap}
+.pw-toggle{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--accent);cursor:pointer;margin-left:8px;font-weight:600}
+.pw-toggle:hover{color:var(--accent-hover)}
+
+/* === PRODUCT ITEMS === */
+.product-item{background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light);padding:14px;margin-bottom:8px;position:relative;transition:border-color .2s}
+.product-item:hover{border-color:var(--border)}
+.product-item h4{font-size:14px;font-weight:600;margin-bottom:4px}
+.product-item .product-url{font-size:11px;color:var(--accent);text-decoration:none;word-break:break-all}
+.product-item .product-url:hover{text-decoration:underline}
+.product-item .product-status{font-size:11px;padding:2px 8px;border-radius:99px;display:inline-block;margin-top:4px;font-weight:600}
+.product-item .product-actions{position:absolute;top:10px;right:10px;display:flex;gap:4px}
+.option-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:10px 12px;background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius-sm);transition:border-color .2s}
+.option-row:hover{border-color:var(--border)}
+.option-row input{flex:1;border:none;background:transparent;font-size:13px;color:var(--text);padding:0;font-family:inherit}
+.option-row input:focus{outline:none}
+.option-row .opt-divider{width:1px;height:20px;background:var(--border-light);flex-shrink:0}
+.option-row .price-input{max-width:100px;text-align:right}
+.option-row .price-label{font-size:12px;color:var(--text2);flex-shrink:0}
+.option-row .opt-remove{background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:2px 4px;border-radius:4px;transition:all .15s;flex-shrink:0;line-height:1}
+.option-row .opt-remove:hover{color:var(--st-cancelled);background:#FEF2F2}
+.options-section{background:var(--bg);border-radius:var(--radius);border:1px solid var(--border-light);padding:16px;margin-bottom:20px}
+.options-section .section-title{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.product-form-top{display:grid;grid-template-columns:1fr 140px;gap:12px;margin-bottom:4px}
+
+/* === ACCOUNT INFO === */
+.account-info{background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light);padding:16px;margin-bottom:20px}
+.account-info .info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-light);font-size:13px}
+.account-info .info-row:last-child{border-bottom:none}
+.account-info .info-label{color:var(--text2);font-weight:600}
+.account-info .info-value{text-align:right;word-break:break-all}
+
+/* === STATS / CHARTS === */
+.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:24px}
+.chart-card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:20px}
+.chart-card h3{font-size:14px;font-weight:700;margin-bottom:14px;color:var(--text2)}
+.chart-wrap{position:relative;width:100%;height:clamp(200px,30vh,320px);min-width:0}
+.chart-wrap.doughnut{height:clamp(200px,28vh,300px)}
+
+/* === COLOR PICKER === */
+.color-picker-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.color-opt{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all .2s}
+.color-opt:hover,.color-opt.selected{border-color:var(--text);transform:scale(1.1)}
+
+/* === ANIMATION === */
+.fade-in{animation:fadeIn .3s ease}
+
+/* === CUSTOM POPUP === */
+.popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:300;justify-content:center;align-items:center}
+.popup-box{background:var(--card);border-radius:16px;padding:28px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.18);text-align:center;animation:fadeIn .2s ease}
+.popup-msg{font-size:15px;line-height:1.5;margin-bottom:24px;color:var(--text);word-break:break-word}
+.popup-btns{display:flex;gap:8px;justify-content:center}
+.popup-btns .btn{min-width:100px;justify-content:center}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* === MOBILE === */
+@media(max-width:768px){
+  .header{padding:0 16px;height:56px}
+  .header-logo{font-size:17px}
+  .header-logo span{font-size:17px}
+  .main{padding:16px}
+  .tabs{padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{padding:12px 16px;font-size:13px}
+  .summary-cards{grid-template-columns:repeat(2,1fr);gap:10px}
+  .ota-grid{grid-template-columns:1fr}
+  .form-row,.form-row-3{grid-template-columns:1fr}
+  .toolbar{flex-direction:column;align-items:stretch}
+  .search-input{min-width:auto;width:100%}
+  .cal-cell{min-height:50px}
+  .stats-grid{grid-template-columns:1fr}
+  .modal-box{border-radius:12px;max-width:100%}
+  .modal-header{border-radius:12px 12px 0 0}
+}
+
+/* === PRINT === */
+@media print{
+  .header,.tabs,.toolbar,.alert-banner,.btn,.filter-chips,.view-toggle,.no-print{display:none!important}
+  .main{padding:10px;max-width:100%}
+  .modal-overlay{display:none!important}
+  .table-wrap{box-shadow:none;border:1px solid #ddd}
+  .chart-card{break-inside:avoid;box-shadow:none;border:1px solid #ddd}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="headerArea"></div>
+  <div id="tabsArea"></div>
+  <div id="mainArea" class="main"></div>
+</div>
+<div id="modalOverlay" class="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal-box" id="modalBox" onclick="event.stopPropagation()">
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div id="popupOverlay" class="popup-overlay">
+  <div class="popup-box">
+    <div class="popup-msg" id="popupMsg"></div>
+    <div class="popup-btns" id="popupBtns"></div>
+  </div>
+</div>
+<script>
+/* ===== I18N ===== */
+var LANG = {
+  ja: {
+    appTitle: 'Japan Beyond', appSub: 'OTA予約管理',
+    tabOta: 'OTA現況', tabRes: '予約管理', tabStats: '統計',
+    operatingOtas: '運営OTA数', registeredProducts: '登録商品数',
+    totalReservations: '全体予約数', avgCommission: '平均手数料',
+    market: '市場', commission: '手数料', products: '商品',
+    reservations: '予約', accountId: 'アカウントID',
+    addOtaSite: 'OTAサイト追加', edit: '編集', del: '削除',
+    save: '保存', cancel: 'キャンセル', close: '閉じる', confirmDel: '本当に削除しますか？',
+    siteName: 'サイト名', commissionRate: '手数料率(%)',
+    marketTarget: '対象市場', siteUrl: 'サイトURL',
+    loginId: 'ログインID', password: 'パスワード',
+    emailDomain: 'メールドメイン', colorSelect: 'カラー選択',
+    accountInfo: 'アカウント情報', showPw: '表示', hidePw: '非表示',
+    productList: '登録商品一覧', addProduct: '商品追加',
+    productName: '商品名', productUrl: '商品ページURL',
+    statusField: '状態', published: '公開中', unpublished: '非公開',
+    optionName: 'オプション名', price: '価格(¥)',
+    addOption: 'オプション追加', removeOption: '削除',
+    editProduct: '商品編集', addNewProduct: '新規商品追加',
+    search: '検索...', allOtas: 'すべて',
+    listView: 'リスト', calView: 'カレンダー',
+    csvExport: 'CSV出力', addReservation: '予約追加',
+    ota: 'OTA', bookingNo: '予約番号', guest: 'ゲスト',
+    tour: 'ツアー', date: '日付', vehicle: '車両', status: '状態',
+    confirmed: '確定', pending: '保留', cancelled: 'キャンセル', completed: '完了',
+    priceField: '料金(¥)', pax: '人数', carSeat: 'チャイルドシート',
+    pickup: 'ピックアップ', dropoff: 'ドロップオフ',
+    pickupTime: 'ピックアップ時間',
+    email: 'メール', phone: '電話番号', notes: 'メモ',
+    repeater: 'リピーター', deleteRes: '予約削除',
+    editReservation: '予約編集', addNewReservation: '新規予約追加',
+    alertTomorrow: '明日の予約があります', alertDayAfter: '明後日の予約があります',
+    prevMonth: '◀ 前月', nextMonth: '次月 ▶',
+    sun: '日', mon: '月', tue: '火', wed: '水', thu: '木', fri: '金', sat: '土',
+    totalRevenue: '総売上', netRevenue: '実収入額',
+    commissionAmt: '手数料額', totalGuests: '総人員',
+    chartResByOta: 'OTA別予約', chartRevByOta: 'OTA別売上',
+    chartByStatus: '予約状態', chartRevByTour: 'ツアー別売上',
+    chartResByTour: 'ツアー別予約', chartMonthly: '月別売上推移',
+    syncSettings: '同期設定', webAppUrl: 'Web App URL',
+    saveUrl: 'URL保存', manualImport: '手動インポート',
+    importJson: 'JSONインポート', pasteJson: 'JSONを貼り付けてください',
+    connected: '接続中', disconnected: '未接続',
+    sync: '同期', settings: '設定', noData: 'データなし',
+    marketKorea: '韓国', marketAsia: 'アジア', marketGlobal: 'グローバル',
+    options: 'オプション', noReservations: '予約がありません',
+    showPast: '過去の予約を含む',
+    driver: 'ドライバー', drivers: 'ドライバー管理',
+    addDriver: 'ドライバー追加', driverName: '名前', driverPhone: '電話番号',
+    driverVehicles: '運転可能車両', noDriver: '未配車', unassigned: '未配車',
+    driverConflict: 'このドライバーは同日に他の予約があります',
+    productCommission: '商品手数料(%)', grossPrice: '売上', netPrice: '実収入', autoCalc: '自動計算済み',
+    priceInputMode: '入力金額',
+    geminiKey: 'Gemini API Key', pasteEmail: 'メール貼り付け',
+    parseEmail: 'メールから予約登録', parsing: '解析中...',
+    emailPlaceholder: '予約確認メールの本文を貼り付けてください'
+  },
+  ko: {
+    appTitle: 'Japan Beyond', appSub: 'OTA 예약 관리',
+    tabOta: 'OTA 현황', tabRes: '예약 관리', tabStats: '통계',
+    operatingOtas: '운영 OTA 수', registeredProducts: '등록 상품 수',
+    totalReservations: '전체 예약 수', avgCommission: '평균 수수료',
+    market: '시장', commission: '수수료', products: '상품',
+    reservations: '예약', accountId: '계정 ID',
+    addOtaSite: 'OTA 사이트 추가', edit: '수정', del: '삭제',
+    save: '저장', cancel: '취소', close: '닫기', confirmDel: '정말 삭제하시겠습니까?',
+    siteName: '사이트명', commissionRate: '수수료율(%)',
+    marketTarget: '대상 시장', siteUrl: '사이트 URL',
+    loginId: '로그인 ID', password: '비밀번호',
+    emailDomain: '이메일 도메인', colorSelect: '색상 선택',
+    accountInfo: '계정 정보', showPw: '표시', hidePw: '숨김',
+    productList: '등록 상품 목록', addProduct: '상품 추가',
+    productName: '상품명', productUrl: '상품 페이지 URL',
+    statusField: '상태', published: '게시됨', unpublished: '미게시',
+    optionName: '옵션명', price: '가격(¥)',
+    addOption: '옵션 추가', removeOption: '삭제',
+    editProduct: '상품 수정', addNewProduct: '새 상품 추가',
+    search: '검색...', allOtas: '전체',
+    listView: '리스트', calView: '캘린더',
+    csvExport: 'CSV 내보내기', addReservation: '예약 추가',
+    ota: 'OTA', bookingNo: '예약번호', guest: '게스트',
+    tour: '투어', date: '날짜', vehicle: '차량', status: '상태',
+    confirmed: '확정', pending: '보류', cancelled: '취소', completed: '완료',
+    priceField: '가격(¥)', pax: '인원', carSeat: '카시트',
+    pickup: '픽업', dropoff: '드롭',
+    pickupTime: '픽업 시간',
+    email: '이메일', phone: '전화번호', notes: '메모',
+    repeater: '리피터', deleteRes: '예약 삭제',
+    editReservation: '예약 수정', addNewReservation: '새 예약 추가',
+    alertTomorrow: '내일 예약이 있습니다', alertDayAfter: '모레 예약이 있습니다',
+    prevMonth: '◀ 이전', nextMonth: '다음 ▶',
+    sun: '일', mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토',
+    totalRevenue: '총 매출', netRevenue: '실수령액',
+    commissionAmt: '수수료 금액', totalGuests: '총 인원',
+    chartResByOta: 'OTA별 예약', chartRevByOta: 'OTA별 매출',
+    chartByStatus: '예약 상태', chartRevByTour: '투어별 매출',
+    chartResByTour: '투어별 예약', chartMonthly: '월별 매출 추이',
+    syncSettings: '동기화 설정', webAppUrl: 'Web App URL',
+    saveUrl: 'URL 저장', manualImport: '수동 가져오기',
+    importJson: 'JSON 가져오기', pasteJson: 'JSON을 붙여넣으세요',
+    connected: '연결됨', disconnected: '미연결',
+    sync: '동기화', settings: '설정', noData: '데이터 없음',
+    marketKorea: '한국', marketAsia: '아시아', marketGlobal: '글로벌',
+    options: '옵션', noReservations: '예약이 없습니다',
+    showPast: '지난 예약 포함',
+    driver: '드라이버', drivers: '드라이버 관리',
+    addDriver: '드라이버 추가', driverName: '이름', driverPhone: '전화번호',
+    driverVehicles: '운전 가능 차량', noDriver: '미배차', unassigned: '미배차',
+    driverConflict: '이 드라이버는 같은 날 다른 예약이 있습니다',
+    productCommission: '상품 수수료(%)', grossPrice: '매출', netPrice: '실수령', autoCalc: '자동 계산됨',
+    priceInputMode: '입력 금액',
+    geminiKey: 'Gemini API Key', pasteEmail: '메일 붙여넣기',
+    parseEmail: '메일에서 예약 등록', parsing: '분석 중...',
+    emailPlaceholder: '예약 확인 메일 본문을 붙여넣으세요'
+  },
+  en: {
+    appTitle: 'Japan Beyond', appSub: 'OTA Booking Manager',
+    tabOta: 'OTA Status', tabRes: 'Reservations', tabStats: 'Statistics',
+    operatingOtas: 'Active OTAs', registeredProducts: 'Products',
+    totalReservations: 'Total Bookings', avgCommission: 'Avg. Commission',
+    market: 'Market', commission: 'Commission', products: 'Products',
+    reservations: 'Bookings', accountId: 'Account ID',
+    addOtaSite: 'Add OTA Site', edit: 'Edit', del: 'Delete',
+    save: 'Save', cancel: 'Cancel', close: 'Close', confirmDel: 'Are you sure you want to delete?',
+    siteName: 'Site Name', commissionRate: 'Commission (%)',
+    marketTarget: 'Target Market', siteUrl: 'Site URL',
+    loginId: 'Login ID', password: 'Password',
+    emailDomain: 'Email Domain', colorSelect: 'Color',
+    accountInfo: 'Account Info', showPw: 'Show', hidePw: 'Hide',
+    productList: 'Registered Products', addProduct: 'Add Product',
+    productName: 'Product Name', productUrl: 'Product Page URL',
+    statusField: 'Status', published: 'Published', unpublished: 'Unpublished',
+    optionName: 'Option Name', price: 'Price (¥)',
+    addOption: 'Add Option', removeOption: 'Remove',
+    editProduct: 'Edit Product', addNewProduct: 'Add New Product',
+    search: 'Search...', allOtas: 'All',
+    listView: 'List', calView: 'Calendar',
+    csvExport: 'CSV Export', addReservation: 'Add Booking',
+    ota: 'OTA', bookingNo: 'Booking No.', guest: 'Guest',
+    tour: 'Tour', date: 'Date', vehicle: 'Vehicle', status: 'Status',
+    confirmed: 'Confirmed', pending: 'Pending', cancelled: 'Cancelled', completed: 'Completed',
+    priceField: 'Price (¥)', pax: 'Guests', carSeat: 'Car Seat',
+    pickup: 'Pickup', dropoff: 'Drop-off',
+    pickupTime: 'Pickup Time',
+    email: 'Email', phone: 'Phone', notes: 'Notes',
+    repeater: 'Repeater', deleteRes: 'Delete Booking',
+    editReservation: 'Edit Booking', addNewReservation: 'Add New Booking',
+    alertTomorrow: 'You have bookings tomorrow', alertDayAfter: 'You have bookings the day after tomorrow',
+    prevMonth: '◀ Prev', nextMonth: 'Next ▶',
+    sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
+    totalRevenue: 'Total Revenue', netRevenue: 'Net Revenue',
+    commissionAmt: 'Commission', totalGuests: 'Total Guests',
+    chartResByOta: 'Bookings by OTA', chartRevByOta: 'Revenue by OTA',
+    chartByStatus: 'Booking Status', chartRevByTour: 'Revenue by Tour',
+    chartResByTour: 'Bookings by Tour', chartMonthly: 'Monthly Revenue',
+    syncSettings: 'Sync Settings', webAppUrl: 'Web App URL',
+    saveUrl: 'Save URL', manualImport: 'Manual Import',
+    importJson: 'Import JSON', pasteJson: 'Paste JSON here',
+    connected: 'Connected', disconnected: 'Disconnected',
+    sync: 'Sync', settings: 'Settings', noData: 'No data',
+    marketKorea: 'Korea', marketAsia: 'Asia', marketGlobal: 'Global',
+    options: 'Options', noReservations: 'No reservations',
+    showPast: 'Include past bookings',
+    driver: 'Driver', drivers: 'Driver Management',
+    addDriver: 'Add Driver', driverName: 'Name', driverPhone: 'Phone',
+    driverVehicles: 'Vehicles', noDriver: 'Unassigned', unassigned: 'Unassigned',
+    driverConflict: 'This driver has another booking on the same day',
+    productCommission: 'Product Commission(%)', grossPrice: 'Gross', netPrice: 'Net', autoCalc: 'Auto-calculated',
+    priceInputMode: 'Price input',
+    geminiKey: 'Gemini API Key', pasteEmail: 'Paste Email',
+    parseEmail: 'Register from Email', parsing: 'Parsing...',
+    emailPlaceholder: 'Paste the booking confirmation email here'
+  }
+};
+
+var currentLang = localStorage.getItem('jb-lang') || 'ja';
+function t(key) { return (LANG[currentLang] && LANG[currentLang][key]) || key; }
+
+/* ===== STATE ===== */
+var data = { otas: [], reservations: [] };
+var currentTab = 'ota';
+var resView = 'list';
+var calYear = new Date().getFullYear();
+var calMonth = new Date().getMonth();
+var searchQ = '';
+var filterOtaId = '';
+var showPastRes = false;
+var chartInstances = [];
+var syncInterval = null;
+var syncConnected = false;
+
+var OTA_COLORS = ['#4A90D9','#FF6B35','#2D9B4E','#9B59B6','#E74C3C','#1ABC9C','#F39C12','#34495E'];
+
+/* ===== DEFAULT DATA ===== */
+function getDefaultData() {
+  return {
+    drivers: [],
+    otas: [
+      { id:'myrealtrip', name:'MyRealTrip', commission:20, market:'korea',
+        url:'https://www.myrealtrip.com', loginId:'japanbeyond', password:'pw1234',
+        emailDomain:'myrealtrip.com', color:'#4A90D9', products:[] },
+      { id:'klook', name:'Klook', commission:20, market:'asia',
+        url:'https://www.klook.com', loginId:'japanbeyond', password:'pw1234',
+        emailDomain:'klook.com', color:'#FF6B35', products:[
+          { id:'p1', name:'Furano & Biei Private Tour', url:'', status:'published',
+            options:[{name:'ALPHARD',price:85000},{name:'HIACE',price:120000},{name:'Micro Bus',price:180000}]},
+          { id:'p2', name:'Sapporo One-Day Private Tour', url:'', status:'published',
+            options:[{name:'ALPHARD',price:55000},{name:'HIACE',price:75000},{name:'Micro Bus',price:110000}]},
+          { id:'p3', name:'Takino & Shikotsu & Noboribetsu Tour', url:'', status:'published',
+            options:[{name:'ALPHARD',price:80000},{name:'HIACE',price:110000},{name:'Micro Bus',price:170000}]},
+          { id:'p4', name:'Lake Toya & Noboribetsu Tour', url:'', status:'published',
+            options:[{name:'ALPHARD',price:90000},{name:'HIACE',price:130000},{name:'Micro Bus',price:190000}]},
+          { id:'p5', name:'Shakotan & Otaru Tour', url:'', status:'published',
+            options:[{name:'ALPHARD',price:70000},{name:'HIACE',price:95000},{name:'Micro Bus',price:150000}]}
+        ]},
+      { id:'viator', name:'Viator', commission:20, market:'global',
+        url:'https://www.viator.com', loginId:'japanbeyond', password:'pw1234',
+        emailDomain:'viator.com', color:'#2D9B4E', products:[] }
+    ],
+    reservations: []
+  };
+}
+
+/* ===== DATA LOAD / SAVE ===== */
+function loadData() {
+  var stored = localStorage.getItem('jb-ota-data');
+  if (stored) {
+    try {
+      data = JSON.parse(stored);
+      if (data.reservations && data.reservations.length > 0 && data.reservations[0].id === 'res001') {
+        data.reservations = [];
+        localStorage.setItem('jb-ota-data', JSON.stringify(data));
+      }
+    } catch(e) { data = getDefaultData(); }
+  } else {
+    data = getDefaultData();
+  }
+  if (!data.otas) data.otas = [];
+  if (!data.reservations) data.reservations = [];
+  if (!data.drivers) data.drivers = [];
+}
+
+function saveData() {
+  localStorage.setItem('jb-ota-data', JSON.stringify(data));
+  try { syncToServer(); } catch(e) {}
+}
+
+/* ===== UTILS ===== */
+function genId() { return 'id' + Date.now() + Math.random().toString(36).substr(2,6); }
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+function fmtDate(d) { return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+function fmtYen(n) { return '¥' + Number(n||0).toLocaleString(); }
+function todayStr() { return fmtDate(new Date()); }
+function escHtml(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+function getOta(id) {
+  var otas = data.otas || [];
+  for (var i=0;i<otas.length;i++) { if(otas[i].id===id) return otas[i]; }
+  return null;
+}
+function getOtaName(id) { var o=getOta(id); return o?o.name:id; }
+function getOtaColor(id) { var o=getOta(id); return o?o.color:'#888'; }
+function getOtaCommission(id) { var o=getOta(id); return o?o.commission:0; }
+
+function getMarketText(m) {
+  var k = (m||'').toLowerCase();
+  if(k==='korea') return t('marketKorea');
+  if(k==='asia') return t('marketAsia');
+  if(k==='global') return t('marketGlobal');
+  return m;
+}
+function getStatusText(s) {
+  var map = {confirmed:t('confirmed'),pending:t('pending'),cancelled:t('cancelled'),completed:t('completed')};
+  return map[s]||s;
+}
+function getStatusColor(s) {
+  var map = {confirmed:'#2D9B4E',pending:'#E8A838',cancelled:'#D94848',completed:'#888'};
+  return map[s]||'#888';
+}
+function getRepeaters() {
+  var res = data.reservations || [];
+  var counts = {};
+  res.forEach(function(r){ var n=(r.guest||'').trim().toLowerCase(); if(n) counts[n]=(counts[n]||0)+1; });
+  var rep = {};
+  for(var n in counts){ if(counts[n]>=2) rep[n]=true; }
+  return rep;
+}
+
+function getDriverName(driver) {
+  return driver || '';
+}
+
+function matchProductPrice(otaId, tourName, vehicle) {
+  if(!tourName) return null;
+  var otas = data.otas || [];
+  var searchOtas = otaId ? otas.filter(function(o){return o.id===otaId;}) : otas;
+  var tn = tourName.toLowerCase();
+  var vn = (vehicle||'').toLowerCase();
+  for(var i=0;i<searchOtas.length;i++){
+    var prods = searchOtas[i].products || [];
+    for(var j=0;j<prods.length;j++){
+      var p = prods[j];
+      var pn = (p.name||'').toLowerCase();
+      if(tn.indexOf(pn)>=0 || pn.indexOf(tn)>=0 || fuzzyMatch(pn, tn)) {
+        var comm = p.commission !== undefined ? p.commission : searchOtas[i].commission;
+        var opts = p.options || [];
+        for(var k=0;k<opts.length;k++){
+          var on = (opts[k].name||'').toLowerCase();
+          if(vn && (vn.indexOf(on)>=0 || on.indexOf(vn)>=0)) {
+            var gross = opts[k].price;
+            var net = Math.round(gross * (100 - comm) / 100);
+            return {gross:gross, commission:comm, net:net, productName:p.name, optionName:opts[k].name};
+          }
+        }
+        if(opts.length>0) {
+          var gross = opts[0].price;
+          var net = Math.round(gross * (100 - comm) / 100);
+          return {gross:gross, commission:comm, net:net, productName:p.name, optionName:opts[0].name};
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function fuzzyMatch(a, b) {
+  var wordsA = a.replace(/[^a-z0-9 ]/g,'').split(' ').filter(function(w){return w.length>2;});
+  var wordsB = b.replace(/[^a-z0-9 ]/g,'').split(' ').filter(function(w){return w.length>2;});
+  if(wordsA.length===0) return false;
+  var matched = 0;
+  wordsA.forEach(function(wa){
+    wordsB.forEach(function(wb){
+      if(wa===wb || wb.indexOf(wa)>=0 || wa.indexOf(wb)>=0) matched++;
+    });
+  });
+  return matched >= Math.min(2, wordsA.length);
+}
+
+function getDriverConflict(driverName, date, excludeResId) {
+  if(!driverName || !date) return false;
+  var dn = driverName.trim().toLowerCase();
+  var res = data.reservations || [];
+  for(var i=0;i<res.length;i++){
+    var r = res[i];
+    if((r.driver||'').trim().toLowerCase() === dn && r.date === date && r.id !== excludeResId && r.status !== 'cancelled') return r;
+  }
+  return false;
+}
+
+/* ===== DRIVER MANAGEMENT ===== */
+function showDriverManager() {
+  var drivers = data.drivers || [];
+  var h = '';
+  h += '<div class="modal-header"><h2>' + t('drivers') + '</h2>';
+  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  if(drivers.length > 0) {
+    drivers.forEach(function(d){
+      h += '<div class="product-item">';
+      h += '<div class="product-actions">';
+      h += '<button class="btn btn-sm btn-outline" onclick="showDriverForm(\'' + d.id + '\')">' + t('edit') + '</button>';
+      h += '<button class="btn btn-sm btn-danger" onclick="deleteDriver(\'' + d.id + '\')">' + t('del') + '</button>';
+      h += '</div>';
+      h += '<h4>' + escHtml(d.name) + '</h4>';
+      h += '<div style="font-size:12px;color:var(--text2)">';
+      if(d.phone) h += d.phone + ' · ';
+      h += (d.vehicles || t('noData'));
+      h += '</div></div>';
+    });
+  } else {
+    h += '<div style="text-align:center;color:var(--text2);padding:20px">' + t('noData') + '</div>';
+  }
+  h += '<div style="margin-top:16px">';
+  h += '<button class="btn btn-accent" onclick="showDriverForm(null)">' + t('addDriver') + '</button>';
+  h += '</div></div>';
+  showModal(h, false);
+}
+
+function showDriverForm(driverId) {
+  var d = null;
+  if(driverId) {
+    var drivers = data.drivers || [];
+    for(var i=0;i<drivers.length;i++){ if(drivers[i].id===driverId){d=drivers[i];break;} }
+  }
+  var title = d ? t('edit') : t('addDriver');
+  var h = '';
+  h += '<div class="modal-header"><h2>' + title + '</h2>';
+  h += '<button class="modal-close" onclick="showDriverManager()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += '<form onsubmit="saveDriver(event,\'' + (driverId||'') + '\')">';
+  h += formGroup(t('driverName'), '<input id="df-name" value="' + escHtml(d?d.name:'') + '" required>');
+  h += formGroup(t('driverPhone'), '<input id="df-phone" value="' + escHtml(d?d.phone:'') + '">');
+  h += formGroup(t('driverVehicles'), '<input id="df-vehicles" value="' + escHtml(d?d.vehicles:'') + '" placeholder="ALPHARD, HIACE, Micro Bus">');
+  h += '<div class="form-actions">';
+  h += '<button type="button" class="btn btn-outline" onclick="showDriverManager()">' + t('cancel') + '</button>';
+  h += '<button type="submit" class="btn btn-accent">' + t('save') + '</button>';
+  h += '</div></form></div>';
+  showModal(h, false);
+}
+
+function saveDriver(e, driverId) {
+  e.preventDefault();
+  if(!data.drivers) data.drivers = [];
+  var obj = {
+    name: document.getElementById('df-name').value.trim(),
+    phone: document.getElementById('df-phone').value.trim(),
+    vehicles: document.getElementById('df-vehicles').value.trim()
+  };
+  if(driverId) {
+    for(var i=0;i<data.drivers.length;i++){
+      if(data.drivers[i].id===driverId){ obj.id=driverId; data.drivers[i]=obj; break; }
+    }
+  } else {
+    obj.id = genId();
+    data.drivers.push(obj);
+  }
+  saveData();
+  showDriverManager();
+}
+
+function deleteDriver(driverId) {
+  showConfirm(t('confirmDel'), function(){
+    data.drivers = (data.drivers||[]).filter(function(d){return d.id!==driverId;});
+    saveData();
+    showDriverManager();
+  });
+}
+
+/* ===== MODAL ===== */
+function showModal(html, wide) {
+  var box = document.getElementById('modalBox');
+  box.style.maxWidth = wide ? '720px' : '600px';
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalOverlay').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('modalOverlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function handleOverlayClick(e) { if(e.target.id==='modalOverlay') closeModal(); }
+
+/* ===== CUSTOM POPUP ===== */
+function showPopup(msg, onOk) {
+  document.getElementById('popupMsg').textContent = msg;
+  var btns = '<button class="btn btn-accent" onclick="closePopup()">' + t('close') + '</button>';
+  document.getElementById('popupBtns').innerHTML = btns;
+  document.getElementById('popupOverlay').style.display = 'flex';
+  window._popupOk = onOk || null;
+}
+
+function showConfirm(msg, onYes) {
+  document.getElementById('popupMsg').textContent = msg;
+  var btns = '';
+  btns += '<button class="btn btn-outline" onclick="closePopup()">' + t('cancel') + '</button>';
+  btns += '<button class="btn btn-danger" onclick="closePopup();if(window._popupYes)window._popupYes()">' + t('del') + '</button>';
+  document.getElementById('popupBtns').innerHTML = btns;
+  document.getElementById('popupOverlay').style.display = 'flex';
+  window._popupYes = onYes || null;
+}
+
+function closePopup() {
+  document.getElementById('popupOverlay').style.display = 'none';
+  window._popupYes = null;
+  window._popupOk = null;
+}
+
+/* ===== RENDER HEADER ===== */
+function renderHeader() {
+  var syncUrl = localStorage.getItem('jb-sync-url') || '';
+  var dotClass = syncConnected ? 'connected' : 'disconnected';
+  var dotTitle = syncConnected ? t('connected') : t('disconnected');
+  var h = '';
+  h += '<div class="header">';
+  h += '<div class="header-logo">' + t('appTitle') + ' <span>OTA</span></div>';
+  h += '<div class="header-right">';
+  h += '<select class="lang-select" onchange="changeLang(this.value)">';
+  h += '<option value="ja"' + (currentLang==='ja'?' selected':'') + '>日本語</option>';
+  h += '<option value="ko"' + (currentLang==='ko'?' selected':'') + '>한국어</option>';
+  h += '<option value="en"' + (currentLang==='en'?' selected':'') + '>English</option>';
+  h += '</select>';
+  h += '<span class="sync-dot ' + dotClass + '" title="' + dotTitle + '"></span>';
+  h += '<button class="btn btn-outline btn-sm" onclick="doSync()" title="' + t('sync') + '">Sync</button>';
+  h += '<button class="btn btn-outline btn-sm" onclick="showSyncSettings()" title="' + t('settings') + '">Settings</button>';
+  h += '</div></div>';
+  document.getElementById('headerArea').innerHTML = h;
+}
+
+/* ===== RENDER TABS ===== */
+function renderTabs() {
+  var tabs = [
+    {id:'ota', label:t('tabOta')},
+    {id:'res', label:t('tabRes')},
+    {id:'stats', label:t('tabStats')}
+  ];
+  var h = '<div class="tabs">';
+  tabs.forEach(function(tb){
+    h += '<div class="tab' + (currentTab===tb.id?' active':'') + '" onclick="switchTab(\'' + tb.id + '\')">' + tb.label + '</div>';
+  });
+  h += '</div>';
+  document.getElementById('tabsArea').innerHTML = h;
+}
+
+function switchTab(id) {
+  currentTab = id;
+  renderTabs();
+  renderMain();
+}
+
+/* ===== RENDER MAIN ===== */
+function renderMain() {
+  if(currentTab==='ota') renderOtaTab();
+  else if(currentTab==='res') renderResTab();
+  else if(currentTab==='stats') renderStatsTab();
+}
+
+/* ===== OTA TAB ===== */
+function renderOtaTab() {
+  var otas = data.otas || [];
+  var reservations = data.reservations || [];
+  var totalProducts = 0;
+  otas.forEach(function(o){ totalProducts += (o.products||[]).length; });
+  var h = '<div class="fade-in">';
+  h += '<div class="summary-cards">';
+  h += summaryCard('', t('operatingOtas'), otas.length);
+  h += summaryCard('', t('registeredProducts'), totalProducts);
+  h += summaryCard('', t('totalReservations'), reservations.length);
+  h += '</div>';
+  h += '<div class="ota-grid">';
+  otas.forEach(function(o){
+    var otaRes = reservations.filter(function(r){return r.otaId===o.id;});
+    h += otaCard(o, otaRes.length);
+  });
+  h += '<div class="ota-card-add" onclick="showAddOta()">';
+  h += '<div class="plus">+</div>';
+  h += '<div class="label">' + t('addOtaSite') + '</div>';
+  h += '</div>';
+  h += '</div>';
+  h += '</div>';
+  document.getElementById('mainArea').innerHTML = h;
+}
+
+function summaryCard(icon, label, value) {
+  var h = '<div class="summary-card">';
+  h += '<div class="value">' + value + '</div>';
+  h += '<div class="label">' + label + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function otaCard(o, resCount) {
+  var prods = (o.products||[]).length;
+  var h = '<div class="ota-card" onclick="showOtaDetail(\'' + o.id + '\')">';
+  h += '<div class="ota-color-bar" style="background:' + o.color + '"></div>';
+  h += '<div class="ota-card-body">';
+  h += '<div class="hover-btns">';
+  h += '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();showEditOta(\'' + o.id + '\')">' + t('edit') + '</button>';
+  h += '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteOta(\'' + o.id + '\')">' + t('del') + '</button>';
+  h += '</div>';
+  h += '<h3>' + escHtml(o.name) + '</h3>';
+  h += '<div class="ota-meta">' + getMarketText(o.market);
+  if(o.loginId) h += ' · ' + t('accountId') + ': ' + escHtml(o.loginId);
+  h += '</div>';
+  h += '<div class="ota-stats">';
+  h += '<div class="ota-stat"><div class="num">' + prods + '</div><div class="lbl">' + t('products') + '</div></div>';
+  h += '<div class="ota-stat"><div class="num">' + resCount + '</div><div class="lbl">' + t('reservations') + '</div></div>';
+  h += '</div></div></div>';
+  return h;
+}
+
+/* ===== OTA DETAIL MODAL ===== */
+function showOtaDetail(otaId) {
+  var o = getOta(otaId);
+  if(!o) return;
+  var h = '';
+  h += '<div class="modal-header"><h2>' + escHtml(o.name) + '</h2>';
+  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += '<div class="account-info">';
+  h += '<div style="font-weight:700;margin-bottom:8px">' + t('accountInfo') + '</div>';
+  h += infoRow(t('loginId'), escHtml(o.loginId||''));
+  h += '<div class="info-row"><span class="info-label">' + t('password') + '</span>';
+  h += '<span class="info-value"><span id="pwDisplay">••••••••</span>';
+  h += '<span class="pw-toggle" onclick="togglePw(\'' + escHtml(o.password||'') + '\')">';
+  h += '<span id="pwToggleLabel">' + t('showPw') + '</span></span></span></div>';
+  if(o.url) {
+    h += '<div class="info-row"><span class="info-label">URL</span>';
+    h += '<span class="info-value"><a href="' + escHtml(o.url) + '" target="_blank" style="color:var(--accent)">' + escHtml(o.url) + '</a></span></div>';
+  }
+  if(o.emailDomain) h += infoRow(t('emailDomain'), escHtml(o.emailDomain));
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+  h += '<div style="font-weight:700">' + t('productList') + '</div>';
+  h += '<button class="btn btn-accent btn-sm" onclick="showProductForm(\'' + otaId + '\',null)">' + t('addProduct') + '</button>';
+  h += '</div>';
+  var prods = o.products || [];
+  if(prods.length===0) {
+    h += '<div style="text-align:center;color:var(--text2);padding:20px">' + t('noData') + '</div>';
+  }
+  prods.forEach(function(p, idx){
+    h += '<div class="product-item">';
+    h += '<div class="product-actions">';
+    h += '<button class="btn btn-sm btn-outline" onclick="showProductForm(\'' + otaId + '\',\'' + p.id + '\')">' + t('edit') + '</button>';
+    h += '<button class="btn btn-sm btn-danger" onclick="deleteProduct(\'' + otaId + '\',\'' + p.id + '\')">' + t('del') + '</button>';
+    h += '</div>';
+    h += '<h4>' + escHtml(p.name) + '</h4>';
+    if(p.url) h += '<a class="product-url" href="' + escHtml(p.url) + '" target="_blank">' + escHtml(p.url) + '</a><br>';
+    var stColor = p.status==='published'?'#2D9B4E':'#888';
+    var stBg = p.status==='published'?'#e8f5e9':'#eee';
+    h += '<span class="product-status" style="background:' + stBg + ';color:' + stColor + '">';
+    h += (p.status==='published'?t('published'):t('unpublished')) + '</span>';
+    var pComm = p.commission !== undefined ? p.commission : (o ? o.commission : 20);
+    h += ' <span style="font-size:11px;color:var(--text2);margin-left:6px">' + t('commission') + ' ' + pComm + '%</span>';
+    var opts = p.options || [];
+    if(opts.length>0){
+      h += '<div style="margin-top:8px;font-size:12px;color:var(--text2)">';
+      opts.forEach(function(op){
+        var net = Math.round(op.price * (100 - pComm) / 100);
+        h += '<span style="margin-right:14px">' + escHtml(op.name) + ': ' + fmtYen(op.price) + ' → <span style="color:var(--accent);font-weight:600">' + fmtYen(net) + '</span></span>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+  showModal(h, true);
+}
+
+function infoRow(label, value) {
+  return '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + value + '</span></div>';
+}
+
+var pwVisible = false;
+function togglePw(pw) {
+  pwVisible = !pwVisible;
+  document.getElementById('pwDisplay').textContent = pwVisible ? pw : '••••••••';
+  document.getElementById('pwToggleLabel').textContent = pwVisible ? t('hidePw') : t('showPw');
+}
+
+/* ===== PRODUCT FORM ===== */
+function showProductForm(otaId, productId) {
+  var o = getOta(otaId);
+  if(!o) return;
+  var p = null;
+  if(productId) {
+    var prods = o.products || [];
+    for(var i=0;i<prods.length;i++){ if(prods[i].id===productId){p=prods[i];break;} }
+  }
+  var isEdit = !!p;
+  var title = isEdit ? t('editProduct') : t('addNewProduct');
+  var opts = (p && p.options) ? p.options : [
+    {name:'ALPHARD',price:0},{name:'HIACE',price:0},{name:'Micro Bus',price:0}
+  ];
+
+  var h = '';
+  h += '<div class="modal-header"><h2>' + title + '</h2>';
+  h += '<button class="modal-close" onclick="showOtaDetail(\'' + otaId + '\')">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += '<form onsubmit="saveProduct(event,\'' + otaId + '\',\'' + (productId||'') + '\')">';
+  h += '<div class="product-form-top">';
+  h += formGroup(t('productName'), '<input id="pf-name" value="' + escHtml(p?p.name:'') + '" required placeholder="Tour name">');
+  var commVal = p && p.commission !== undefined ? p.commission : (o ? o.commission : 20);
+  h += formGroup(t('productCommission'), '<input id="pf-commission" type="number" value="' + commVal + '" min="0" max="100">');
+  h += '</div>';
+  h += '<div class="form-row">';
+  h += formGroup(t('productUrl'), '<input id="pf-url" value="' + escHtml(p?p.url:'') + '" placeholder="https://www.klook.com/activity/...">');
+  h += formGroup(t('statusField'),
+    '<select id="pf-status">' +
+    '<option value="published"' + ((p&&p.status==='published')||!p?' selected':'') + '>' + t('published') + '</option>' +
+    '<option value="unpublished"' + (p&&p.status==='unpublished'?' selected':'') + '>' + t('unpublished') + '</option>' +
+    '</select>');
+  h += '</div>';
+  var priceMode = (p && p.priceMode) ? p.priceMode : 'gross';
+  h += '<div class="options-section">';
+  h += '<div class="section-title"><span>' + t('options') + '</span>';
+  h += '<button type="button" class="btn btn-sm btn-outline" onclick="addOptionRow()" style="padding:4px 10px;font-size:11px">+ ' + t('addOption') + '</button>';
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px">';
+  h += '<span style="color:var(--text2)">' + t('priceInputMode') + ':</span>';
+  h += '<div class="view-toggle">';
+  h += '<button type="button" class="vt-btn' + (priceMode==='gross'?' active':'') + '" onclick="setPriceMode(\'gross\')" id="pm-gross">' + t('grossPrice') + '</button>';
+  h += '<button type="button" class="vt-btn' + (priceMode==='net'?' active':'') + '" onclick="setPriceMode(\'net\')" id="pm-net">' + t('netPrice') + '</button>';
+  h += '</div>';
+  h += '</div>';
+  h += '<input type="hidden" id="pf-priceMode" value="' + priceMode + '">';
+  h += '<div id="optionsContainer">';
+  opts.forEach(function(op, idx){
+    h += optionRowHtml(idx, op.name, op.price);
+  });
+  h += '</div>';
+  h += '<div id="optionPreview" style="font-size:12px;color:var(--text2);margin-top:4px"></div>';
+  h += '</div>';
+  h += '<div class="form-actions">';
+  h += '<button type="button" class="btn btn-outline" onclick="showOtaDetail(\'' + otaId + '\')">' + t('cancel') + '</button>';
+  h += '<button type="submit" class="btn btn-accent">' + t('save') + '</button>';
+  h += '</div></form></div>';
+  showModal(h, false);
+}
+
+var optionCounter = 100;
+function optionRowHtml(idx, name, price) {
+  var rid = 'opt-' + (optionCounter++);
+  var h = '<div class="option-row" id="' + rid + '">';
+  h += '<input class="opt-name" value="' + escHtml(name) + '" placeholder="' + t('optionName') + '">';
+  h += '<span class="opt-divider"></span>';
+  h += '<span class="price-label">&yen;</span>';
+  h += '<input class="opt-price price-input" type="number" value="' + (price||0) + '" placeholder="0" oninput="updateOptionPreview()">';
+  h += '<button type="button" class="opt-remove" onclick="removeOptionRow(\'' + rid + '\')">&times;</button>';
+  h += '</div>';
+  return h;
+}
+
+function addOptionRow() {
+  var c = document.getElementById('optionsContainer');
+  var div = document.createElement('div');
+  div.innerHTML = optionRowHtml(optionCounter, '', 0);
+  c.appendChild(div.firstChild);
+}
+
+function removeOptionRow(rid) {
+  var el = document.getElementById(rid);
+  if(el) el.remove();
+  updateOptionPreview();
+}
+
+function setPriceMode(mode) {
+  document.getElementById('pf-priceMode').value = mode;
+  document.getElementById('pm-gross').className = 'vt-btn' + (mode==='gross'?' active':'');
+  document.getElementById('pm-net').className = 'vt-btn' + (mode==='net'?' active':'');
+  updateOptionPreview();
+}
+
+function updateOptionPreview() {
+  var preview = document.getElementById('optionPreview');
+  if(!preview) return;
+  var commEl = document.getElementById('pf-commission');
+  var modeEl = document.getElementById('pf-priceMode');
+  if(!commEl || !modeEl) return;
+  var comm = parseInt(commEl.value) || 0;
+  var mode = modeEl.value;
+  var rows = document.getElementById('optionsContainer').querySelectorAll('.option-row');
+  var html = '';
+  for(var i=0;i<rows.length;i++){
+    var name = rows[i].querySelector('.opt-name').value.trim();
+    var val = parseInt(rows[i].querySelector('.opt-price').value) || 0;
+    if(!name || !val) continue;
+    if(mode === 'gross') {
+      var net = Math.round(val * (100 - comm) / 100);
+      html += '<div style="margin-bottom:2px">' + escHtml(name) + ': ' + t('grossPrice') + ' ' + fmtYen(val) + ' → ' + t('netPrice') + ' <strong style="color:var(--accent)">' + fmtYen(net) + '</strong></div>';
+    } else {
+      var gross = Math.round(val * 100 / (100 - comm));
+      html += '<div style="margin-bottom:2px">' + escHtml(name) + ': ' + t('netPrice') + ' ' + fmtYen(val) + ' ← ' + t('grossPrice') + ' <strong>' + fmtYen(gross) + '</strong></div>';
+    }
+  }
+  preview.innerHTML = html;
+}
+
+function saveProduct(e, otaId, productId) {
+  e.preventDefault();
+  var o = getOta(otaId);
+  if(!o) return;
+  if(!o.products) o.products = [];
+  var name = document.getElementById('pf-name').value.trim();
+  var url = document.getElementById('pf-url').value.trim();
+  var status = document.getElementById('pf-status').value;
+  var commission = parseInt(document.getElementById('pf-commission').value) || 0;
+  var priceMode = document.getElementById('pf-priceMode').value;
+  var optRows = document.getElementById('optionsContainer').querySelectorAll('.option-row');
+  var options = [];
+  for(var i=0;i<optRows.length;i++){
+    var on = optRows[i].querySelector('.opt-name').value.trim();
+    var op = parseInt(optRows[i].querySelector('.opt-price').value) || 0;
+    if(on) {
+      var grossPrice = (priceMode === 'net') ? Math.round(op * 100 / (100 - commission)) : op;
+      options.push({name:on, price:grossPrice});
+    }
+  }
+  if(productId) {
+    for(var i=0;i<o.products.length;i++){
+      if(o.products[i].id===productId){
+        o.products[i].name=name;
+        o.products[i].url=url;
+        o.products[i].status=status;
+        o.products[i].commission=commission;
+        o.products[i].options=options;
+        break;
+      }
+    }
+  } else {
+    o.products.push({id:genId(), name:name, url:url, status:status, commission:commission, options:options});
+  }
+  saveData();
+  showOtaDetail(otaId);
+}
+
+function deleteProduct(otaId, productId) {
+  showConfirm(t('confirmDel'), function(){
+    var o = getOta(otaId);
+    if(!o) return;
+    o.products = (o.products||[]).filter(function(p){return p.id!==productId;});
+    saveData();
+    showOtaDetail(otaId);
+  });
+}
+
+/* ===== ADD / EDIT OTA ===== */
+function showAddOta() { showOtaForm(null); }
+function showEditOta(otaId) { showOtaForm(otaId); }
+
+function showOtaForm(otaId) {
+  var o = otaId ? getOta(otaId) : null;
+  var title = o ? t('edit') + ' ' + escHtml(o.name) : t('addOtaSite');
+  var selColor = o ? o.color : OTA_COLORS[0];
+  var h = '';
+  h += '<div class="modal-header"><h2>' + title + '</h2>';
+  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += '<form onsubmit="saveOta(event,\'' + (otaId||'') + '\')">';
+  h += formGroup(t('siteName'), '<input id="of-name" value="' + escHtml(o?o.name:'') + '" required>');
+  h += '<div class="form-row">';
+  h += formGroup(t('commissionRate'), '<input id="of-comm" type="number" value="' + (o?o.commission:20) + '" min="0" max="100" required>');
+  h += formGroup(t('marketTarget'), '<input id="of-market" value="' + escHtml(o?o.market:'') + '" placeholder="Korea, Asia, Global...">');
+  h += '</div>';
+  h += formGroup(t('siteUrl'), '<input id="of-url" value="' + escHtml(o?o.url:'') + '" placeholder="https://">');
+  h += '<div class="form-row">';
+  h += formGroup(t('loginId'), '<input id="of-lid" value="' + escHtml(o?o.loginId:'') + '">');
+  h += formGroup(t('password'), '<input id="of-pw" type="password" value="' + escHtml(o?o.password:'') + '">');
+  h += '</div>';
+  h += formGroup(t('emailDomain'), '<input id="of-email" value="' + escHtml(o?o.emailDomain:'') + '" placeholder="example.com">');
+  h += '<div class="form-group"><label>' + t('colorSelect') + '</label><div class="color-picker-row" id="colorPicker">';
+  OTA_COLORS.forEach(function(c){
+    h += '<div class="color-opt' + (c===selColor?' selected':'') + '" style="background:' + c + '" onclick="pickColor(this,\'' + c + '\')"></div>';
+  });
+  h += '</div><input type="hidden" id="of-color" value="' + selColor + '"></div>';
+  h += '<div class="form-actions">';
+  h += '<button type="button" class="btn btn-outline" onclick="closeModal()">' + t('cancel') + '</button>';
+  h += '<button type="submit" class="btn btn-accent">' + t('save') + '</button>';
+  h += '</div></form></div>';
+  showModal(h, false);
+}
+
+function pickColor(el, color) {
+  var all = document.getElementById('colorPicker').querySelectorAll('.color-opt');
+  for(var i=0;i<all.length;i++) all[i].classList.remove('selected');
+  el.classList.add('selected');
+  document.getElementById('of-color').value = color;
+}
+
+function saveOta(e, otaId) {
+  e.preventDefault();
+  var name = document.getElementById('of-name').value.trim();
+  var comm = parseInt(document.getElementById('of-comm').value)||0;
+  var market = document.getElementById('of-market').value.trim();
+  var url = document.getElementById('of-url').value.trim();
+  var lid = document.getElementById('of-lid').value.trim();
+  var pw = document.getElementById('of-pw').value;
+  var em = document.getElementById('of-email').value.trim();
+  var color = document.getElementById('of-color').value;
+  if(otaId) {
+    var o = getOta(otaId);
+    if(o){
+      o.name=name; o.commission=comm; o.market=market; o.url=url;
+      o.loginId=lid; o.password=pw; o.emailDomain=em; o.color=color;
+    }
+  } else {
+    var newId = name.toLowerCase().replace(/[^a-z0-9]/g,'') + Date.now().toString(36);
+    data.otas.push({
+      id:newId, name:name, commission:comm, market:market, url:url,
+      loginId:lid, password:pw, emailDomain:em, color:color, products:[]
+    });
+  }
+  saveData();
+  closeModal();
+  renderOtaTab();
+}
+
+function deleteOta(otaId) {
+  showConfirm(t('confirmDel'), function(){
+    data.otas = (data.otas||[]).filter(function(o){return o.id!==otaId;});
+    saveData();
+    renderOtaTab();
+  });
+}
+
+function formGroup(label, inputHtml) {
+  return '<div class="form-group"><label>' + label + '</label>' + inputHtml + '</div>';
+}
+
+/* ===== RESERVATIONS TAB ===== */
+function renderResTab() {
+  var reservations = data.reservations || [];
+  var otas = data.otas || [];
+  var today = new Date();
+  var tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
+  var dayAfter = new Date(today); dayAfter.setDate(dayAfter.getDate()+2);
+  var tmrwStr = fmtDate(tmrw);
+  var dayAfterStr = fmtDate(dayAfter);
+  var tmrwRes = reservations.filter(function(r){return r.date===tmrwStr && r.status!=='cancelled';});
+  var dayAfterRes = reservations.filter(function(r){return r.date===dayAfterStr && r.status!=='cancelled';});
+
+  var h = '<div class="fade-in">';
+  if(tmrwRes.length>0) {
+    h += '<div class="alert-banner"><span class="alert-icon">!</span>';
+    h += '<span>' + t('alertTomorrow') + ' (' + tmrwRes.length + '): ';
+    h += tmrwRes.map(function(r){return escHtml(r.guest);}).join(', ');
+    h += '</span></div>';
+  }
+  if(dayAfterRes.length>0) {
+    h += '<div class="alert-banner"><span class="alert-icon">!</span>';
+    h += '<span>' + t('alertDayAfter') + ' (' + dayAfterRes.length + '): ';
+    h += dayAfterRes.map(function(r){return escHtml(r.guest);}).join(', ');
+    h += '</span></div>';
+  }
+  h += '<div class="toolbar">';
+  h += '<input class="search-input" placeholder="' + t('search') + '" value="' + escHtml(searchQ) + '" oninput="onSearch(this.value)">';
+  h += '<select class="lang-select" onchange="setFilter(this.value)">';
+  h += '<option value="">' + t('allOtas') + '</option>';
+  otas.forEach(function(o){
+    h += '<option value="' + o.id + '"' + (filterOtaId===o.id?' selected':'') + '>' + escHtml(o.name) + '</option>';
+  });
+  h += '</select>';
+  h += '<div style="flex:1"></div>';
+  h += '<div class="view-toggle">';
+  h += '<button class="vt-btn' + (resView==='list'?' active':'') + '" onclick="setResView(\'list\')">' + t('listView') + '</button>';
+  h += '<button class="vt-btn' + (resView==='cal'?' active':'') + '" onclick="setResView(\'cal\')">' + t('calView') + '</button>';
+  h += '</div>';
+  h += '<button class="btn btn-sm' + (showPastRes?' btn-accent':' btn-outline') + '" onclick="togglePastRes()">' + t('showPast') + '</button>';
+  h += '<button class="btn btn-outline btn-sm" onclick="exportCsv()">' + t('csvExport') + '</button>';
+  h += '<button class="btn btn-outline btn-sm" onclick="showEmailParser()">' + t('parseEmail') + '</button>';
+  h += '<button class="btn btn-accent btn-sm" onclick="showResForm(null)">' + t('addReservation') + '</button>';
+  h += '</div>';
+
+  if(resView==='list') {
+    h += renderResList();
+  } else {
+    h += renderCalendar();
+  }
+  h += '</div>';
+  document.getElementById('mainArea').innerHTML = h;
+}
+
+function onSearch(v) { searchQ=v; renderResTab(); }
+function setFilter(id) { filterOtaId=id; renderResTab(); }
+function setResView(v) { resView=v; renderResTab(); }
+function togglePastRes() { showPastRes=!showPastRes; renderResTab(); }
+
+function getFilteredRes() {
+  var res = data.reservations || [];
+  if(!showPastRes) {
+    var td = todayStr();
+    res = res.filter(function(r){ return (r.date||'') >= td; });
+  }
+  if(filterOtaId) res = res.filter(function(r){return r.otaId===filterOtaId;});
+  if(searchQ) {
+    var q = searchQ.toLowerCase();
+    res = res.filter(function(r){
+      return (r.guest||'').toLowerCase().indexOf(q)>=0 ||
+             (r.bookingNo||'').toLowerCase().indexOf(q)>=0 ||
+             (r.tour||'').toLowerCase().indexOf(q)>=0;
+    });
+  }
+  res.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  return res;
+}
+
+function renderResList() {
+  var res = getFilteredRes();
+  var repeaters = getRepeaters();
+  var todayS = todayStr();
+  var h = '<div class="table-wrap"><table>';
+  h += '<thead><tr>';
+  h += '<th>' + t('ota') + '</th>';
+  h += '<th>' + t('bookingNo') + '</th>';
+  h += '<th>' + t('guest') + '</th>';
+  h += '<th>' + t('tour') + '</th>';
+  h += '<th>' + t('date') + '</th>';
+  h += '<th>' + t('pickupTime') + '</th>';
+  h += '<th>' + t('vehicle') + '</th>';
+  h += '<th>' + t('driver') + '</th>';
+  h += '<th>' + t('status') + '</th>';
+  h += '</tr></thead><tbody>';
+  if(res.length===0) {
+    h += '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text2)">' + t('noReservations') + '</td></tr>';
+  }
+  res.forEach(function(r){
+    var isPast = r.date < todayS;
+    h += '<tr class="clickable' + (isPast?' past-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
+    h += '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + getOtaColor(r.otaId) + ';margin-right:6px"></span>' + escHtml(getOtaName(r.otaId)) + '</td>';
+    h += '<td>' + escHtml(r.bookingNo) + '</td>';
+    h += '<td>' + escHtml(r.guest);
+    if(repeaters[(r.guest||'').trim().toLowerCase()]) h += '<span class="badge-repeater">' + t('repeater') + '</span>';
+    h += '</td>';
+    h += '<td>' + escHtml(r.tour) + '</td>';
+    h += '<td>' + escHtml(r.date) + '</td>';
+    h += '<td>' + escHtml(r.pickupTime || '') + '</td>';
+    h += '<td>' + escHtml(r.vehicle) + '</td>';
+    var dn = r.driver || '';
+    h += '<td>' + (dn ? escHtml(dn) : '<span style="color:var(--text2);font-size:11px">' + t('unassigned') + '</span>') + '</td>';
+    h += '<td><span class="status-badge st-' + r.status + '">' + getStatusText(r.status) + '</span></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+}
+
+/* ===== CALENDAR VIEW ===== */
+function renderCalendar() {
+  var year = calYear;
+  var month = calMonth;
+  var firstDay = new Date(year, month, 1).getDay();
+  var daysInMonth = new Date(year, month+1, 0).getDate();
+  var todayS = todayStr();
+  var reservations = data.reservations || [];
+  var monthRes = reservations.filter(function(r){
+    if(!r.date) return false;
+    var parts = r.date.split('-');
+    return parseInt(parts[0])===year && parseInt(parts[1])===(month+1);
+  });
+
+  var monthNames = {
+    ja:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+    ko:['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+    en:['January','February','March','April','May','June','July','August','September','October','November','December']
+  };
+  var mLabel = (monthNames[currentLang]||monthNames.en)[month];
+
+  var h = '<div class="calendar">';
+  h += '<div class="cal-nav">';
+  h += '<button class="btn btn-outline btn-sm" onclick="calPrev()">' + t('prevMonth') + '</button>';
+  h += '<span class="month-label">' + year + ' ' + mLabel + '</span>';
+  h += '<button class="btn btn-outline btn-sm" onclick="calNext()">' + t('nextMonth') + '</button>';
+  h += '</div>';
+  h += '<div class="cal-grid">';
+  var dayNames = [t('sun'),t('mon'),t('tue'),t('wed'),t('thu'),t('fri'),t('sat')];
+  dayNames.forEach(function(d){ h += '<div class="cal-header">' + d + '</div>'; });
+  for(var i=0;i<firstDay;i++) h += '<div class="cal-cell empty"></div>';
+  for(var d=1;d<=daysInMonth;d++){
+    var ds = year + '-' + pad(month+1) + '-' + pad(d);
+    var isToday = ds===todayS;
+    var dayRes = monthRes.filter(function(r){return r.date===ds;});
+    h += '<div class="cal-cell' + (isToday?' today':'') + '">';
+    h += '<span class="cal-day">' + d + '</span>';
+    dayRes.forEach(function(r){
+      h += '<div class="cal-event" style="background:' + getOtaColor(r.otaId) + '" onclick="event.stopPropagation();showResForm(\'' + r.id + '\')">';
+      var calLabel = escHtml(r.guest);
+      var calDriver = r.driver || '';
+      if(calDriver) calLabel += ' [' + escHtml(calDriver) + ']';
+      h += calLabel;
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  var totalCells = firstDay + daysInMonth;
+  var remainder = totalCells % 7;
+  if(remainder > 0) { for(var i=0;i<7-remainder;i++) h += '<div class="cal-cell empty"></div>'; }
+  h += '</div>';
+  var otas = data.otas || [];
+  if(otas.length > 0) {
+    h += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding:0 4px">';
+    otas.forEach(function(o){
+      h += '<div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)">';
+      h += '<span style="width:10px;height:10px;border-radius:3px;background:' + o.color + ';display:inline-block"></span>';
+      h += escHtml(o.name);
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function calPrev() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderResTab(); }
+function calNext() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderResTab(); }
+
+/* ===== RESERVATION FORM MODAL ===== */
+function showResForm(resId) {
+  var r = null;
+  if(resId) {
+    var res = data.reservations || [];
+    for(var i=0;i<res.length;i++){if(res[i].id===resId){r=res[i];break;}}
+  }
+  var isEdit = !!r;
+  var title = isEdit ? t('editReservation') : t('addNewReservation');
+  var otas = data.otas || [];
+
+  var h = '';
+  h += '<div class="modal-header"><h2>' + title + '</h2>';
+  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += '<form onsubmit="saveRes(event,\'' + (resId||'') + '\')">';
+  var otaSelect = '<select id="rf-ota" onchange="onOtaChange()">';
+  otas.forEach(function(o){
+    otaSelect += '<option value="' + o.id + '"' + (r&&r.otaId===o.id?' selected':'') + '>' + escHtml(o.name) + '</option>';
+  });
+  otaSelect += '</select>';
+  h += formGroup(t('ota'), otaSelect);
+  h += '<div class="form-row">';
+  h += formGroup(t('bookingNo'), '<input id="rf-bno" value="' + escHtml(r?r.bookingNo:'') + '">');
+  h += formGroup(t('guest'), '<input id="rf-guest" value="' + escHtml(r?r.guest:'') + '" required>');
+  h += '</div>';
+  var tourVal = r ? r.tour : '';
+  var vehicleVal = r ? r.vehicle : '';
+  h += '<div class="form-row">';
+  h += formGroup(t('tour'), '<select id="rf-tour" onchange="onTourChange()"><option value="">' + tourVal + '</option></select>');
+  h += formGroup(t('vehicle'), '<select id="rf-vehicle" onchange="autoCalcPrice()"><option value="">' + vehicleVal + '</option></select>');
+  h += '</div>';
+  h += '<div class="form-row">';
+  h += formGroup(t('date'), '<input id="rf-date" type="date" value="' + (r?r.date:'') + '" required>');
+  h += formGroup(t('pickupTime'), '<input id="rf-pickupTime" type="time" value="' + escHtml(r?r.pickupTime:'') + '">');
+  h += '</div>';
+  h += '<div class="form-row">';
+  h += formGroup(t('driver'), '<input id="rf-driver" value="' + escHtml(r?r.driver:'') + '" placeholder="' + t('driverName') + '" onchange="checkDriverConflict()">');
+  h += formGroup(t('driverPhone'), '<input id="rf-driverPhone" value="' + escHtml(r?r.driverPhone:'') + '">');
+  h += '</div>';
+  h += '<div id="driverConflictWarn" style="display:none;background:#FFFBEB;border:1px solid #FFE082;border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:12px;color:#92400E"></div>';
+  h += '<div id="priceCalcInfo" style="display:none;background:var(--bg);border:1px solid var(--border-light);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px">';
+  h += '</div>';
+  h += '<div class="form-row">';
+  h += formGroup(t('priceField') + ' (' + t('netPrice') + ')', '<input id="rf-price" type="number" value="' + (r?r.price:'') + '">');
+  h += formGroup(t('pax'), '<input id="rf-pax" type="number" value="' + (r?r.pax:'') + '" min="0">');
+  h += '</div>';
+  h += formGroup(t('carSeat'), '<input id="rf-carseat" type="number" value="' + (r?r.carSeat:0) + '" min="0">');
+  h += '<div class="form-row">';
+  h += formGroup(t('pickup'), '<input id="rf-pickup" value="' + escHtml(r?r.pickup:'') + '">');
+  h += formGroup(t('dropoff'), '<input id="rf-dropoff" value="' + escHtml(r?r.dropoff:'') + '">');
+  h += '</div>';
+  h += '<div class="form-row">';
+  h += formGroup(t('email'), '<input id="rf-email" type="email" value="' + escHtml(r?r.email:'') + '">');
+  h += formGroup(t('phone'), '<input id="rf-phone" value="' + escHtml(r?r.phone:'') + '">');
+  h += '</div>';
+  var statusSelect = '<select id="rf-status">';
+  ['confirmed','pending','cancelled','completed'].forEach(function(s){
+    statusSelect += '<option value="' + s + '"' + (r&&r.status===s?' selected':'') + '>' + getStatusText(s) + '</option>';
+  });
+  statusSelect += '</select>';
+  h += formGroup(t('status'), statusSelect);
+  h += formGroup(t('notes'), '<textarea id="rf-notes">' + escHtml(r?r.notes:'') + '</textarea>');
+  h += '<div class="form-actions">';
+  if(isEdit) h += '<button type="button" class="btn btn-danger" onclick="deleteRes(\'' + resId + '\')" style="margin-right:auto">' + t('deleteRes') + '</button>';
+  h += '<button type="button" class="btn btn-outline" onclick="closeModal()">' + t('cancel') + '</button>';
+  h += '<button type="submit" class="btn btn-accent">' + t('save') + '</button>';
+  h += '</div></form></div>';
+  showModal(h, false);
+  populateTours(tourVal);
+  populateVehicles(tourVal, vehicleVal);
+}
+
+function saveRes(e, resId) {
+  e.preventDefault();
+  var obj = {
+    otaId: document.getElementById('rf-ota').value,
+    bookingNo: document.getElementById('rf-bno').value.trim(),
+    guest: document.getElementById('rf-guest').value.trim(),
+    tour: document.getElementById('rf-tour').value.trim(),
+    date: document.getElementById('rf-date').value,
+    pickupTime: document.getElementById('rf-pickupTime').value,
+    vehicle: document.getElementById('rf-vehicle').value.trim(),
+    price: parseInt(document.getElementById('rf-price').value)||0,
+    pax: parseInt(document.getElementById('rf-pax').value)||0,
+    carSeat: parseInt(document.getElementById('rf-carseat').value)||0,
+    pickup: document.getElementById('rf-pickup').value.trim(),
+    dropoff: document.getElementById('rf-dropoff').value.trim(),
+    email: document.getElementById('rf-email').value.trim(),
+    phone: document.getElementById('rf-phone').value.trim(),
+    status: document.getElementById('rf-status').value,
+    notes: document.getElementById('rf-notes').value.trim(),
+    driver: document.getElementById('rf-driver').value.trim(),
+    driverPhone: document.getElementById('rf-driverPhone').value.trim()
+  };
+  if(!data.reservations) data.reservations = [];
+  if(resId) {
+    for(var i=0;i<data.reservations.length;i++){
+      if(data.reservations[i].id===resId){
+        obj.id = resId;
+        data.reservations[i] = obj;
+        break;
+      }
+    }
+  } else {
+    obj.id = genId();
+    data.reservations.push(obj);
+  }
+  saveData();
+  closeModal();
+  renderMain();
+}
+
+function deleteRes(resId) {
+  showConfirm(t('confirmDel'), function(){
+    data.reservations = (data.reservations||[]).filter(function(r){return r.id!==resId;});
+    saveData();
+    closeModal();
+    renderMain();
+  });
+}
+
+function checkDriverConflict() {
+  var warn = document.getElementById('driverConflictWarn');
+  if(!warn) return;
+  var driverName = document.getElementById('rf-driver').value.trim();
+  var date = document.getElementById('rf-date').value;
+  var form = document.getElementById('rf-driver').closest('form');
+  var resId = form ? form.getAttribute('onsubmit') : '';
+  var match = resId.match(/saveRes\(event,'([^']*)'\)/);
+  var excludeId = match ? match[1] : '';
+  if(!driverName || !date) { warn.style.display='none'; return; }
+  var conflict = getDriverConflict(driverName, date, excludeId);
+  if(conflict) {
+    warn.style.display = 'block';
+    warn.textContent = t('driverConflict') + ': ' + (conflict.guest||'') + ' (' + (conflict.tour||'') + ')';
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
+function autoCalcPrice() {
+  var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
+  var tour = document.getElementById('rf-tour') ? document.getElementById('rf-tour').value.trim() : '';
+  var vehicle = document.getElementById('rf-vehicle') ? document.getElementById('rf-vehicle').value.trim() : '';
+  var info = document.getElementById('priceCalcInfo');
+  var priceInput = document.getElementById('rf-price');
+  if(!tour) { if(info) info.style.display='none'; return; }
+  var result = matchProductPrice(otaId, tour, vehicle);
+  if(result) {
+    if(priceInput) priceInput.value = result.net;
+    if(info) {
+      info.style.display = 'block';
+      info.innerHTML = '<span style="color:var(--accent);font-weight:600">' + t('autoCalc') + '</span> '
+        + escHtml(result.productName) + ' / ' + escHtml(result.optionName)
+        + ' — ' + t('grossPrice') + ': ' + fmtYen(result.gross)
+        + ' - ' + t('commission') + ' ' + result.commission + '%'
+        + ' = <strong>' + t('netPrice') + ': ' + fmtYen(result.net) + '</strong>';
+    }
+  } else {
+    if(info) info.style.display = 'none';
+  }
+}
+
+function populateTours(selectedVal) {
+  var sel = document.getElementById('rf-tour');
+  if(!sel) return;
+  var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
+  var ota = getOta(otaId);
+  var prods = ota ? (ota.products || []) : [];
+  var html = '<option value="">' + t('tour') + '...</option>';
+  prods.forEach(function(p){
+    if(p.status === 'unpublished') return;
+    var selected = (selectedVal && (selectedVal === p.name || p.name.toLowerCase().indexOf(selectedVal.toLowerCase()) >= 0 || selectedVal.toLowerCase().indexOf(p.name.toLowerCase()) >= 0)) ? ' selected' : '';
+    html += '<option value="' + escHtml(p.name) + '"' + selected + '>' + escHtml(p.name) + '</option>';
+  });
+  if(selectedVal && sel.querySelector('option[selected]') === null) {
+    html += '<option value="' + escHtml(selectedVal) + '" selected>' + escHtml(selectedVal) + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+function populateVehicles(tourName, selectedVal) {
+  var sel = document.getElementById('rf-vehicle');
+  if(!sel) return;
+  var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
+  var ota = getOta(otaId);
+  var prods = ota ? (ota.products || []) : [];
+  var options = [];
+  var tn = (tourName || '').toLowerCase();
+  prods.forEach(function(p){
+    var pn = (p.name || '').toLowerCase();
+    if(tn && (tn === pn || tn.indexOf(pn) >= 0 || pn.indexOf(tn) >= 0)) {
+      options = p.options || [];
+    }
+  });
+  var html = '<option value="">' + t('vehicle') + '...</option>';
+  options.forEach(function(op){
+    var sv = (selectedVal || '').toLowerCase();
+    var on = (op.name || '').toLowerCase();
+    var selected = (sv && (sv === on || sv.indexOf(on) >= 0 || on.indexOf(sv) >= 0)) ? ' selected' : '';
+    html += '<option value="' + escHtml(op.name) + '"' + selected + '>' + escHtml(op.name) + ' (' + fmtYen(op.price) + ')</option>';
+  });
+  if(selectedVal && options.length === 0) {
+    html += '<option value="' + escHtml(selectedVal) + '" selected>' + escHtml(selectedVal) + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+function onOtaChange() {
+  populateTours('');
+  populateVehicles('', '');
+  autoCalcPrice();
+}
+
+function onTourChange() {
+  var tour = document.getElementById('rf-tour') ? document.getElementById('rf-tour').value : '';
+  populateVehicles(tour, '');
+  autoCalcPrice();
+}
+
+/* ===== GEMINI EMAIL PARSER ===== */
+function saveGeminiKey() {
+  var key = document.getElementById('gemini-key').value.trim();
+  localStorage.setItem('jb-gemini-key', key);
+  closeModal();
+  showPopup(t('save') + ' OK');
+}
+
+function showEmailParser() {
+  var gkey = getGeminiKey();
+  if(!gkey) { showSyncSettings(); return; }
+  var h = '';
+  h += '<div class="modal-header"><h2>' + t('parseEmail') + '</h2>';
+  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += formGroup(t('pasteEmail'), '<textarea id="email-body" rows="10" placeholder="' + t('emailPlaceholder') + '" style="font-size:12px"></textarea>');
+  h += '<div id="parseStatus" style="display:none;text-align:center;padding:16px;color:var(--text2)"></div>';
+  h += '<div class="form-actions">';
+  h += '<button type="button" class="btn btn-outline" onclick="closeModal()">' + t('cancel') + '</button>';
+  h += '<button type="button" class="btn btn-accent" id="parseBtn" onclick="parseEmailWithGemini()">' + t('parseEmail') + '</button>';
+  h += '</div></div>';
+  showModal(h, false);
+}
+
+function parseEmailWithGemini() {
+  var body = document.getElementById('email-body').value.trim();
+  if(!body) return;
+  var gkey = getGeminiKey();
+  if(!gkey) { showPopup('Gemini API Key not set'); return; }
+
+  var btn = document.getElementById('parseBtn');
+  var status = document.getElementById('parseStatus');
+  btn.disabled = true;
+  btn.textContent = t('parsing');
+  status.style.display = 'block';
+  status.textContent = t('parsing');
+
+  var prompt = 'You are an OTA booking email parser for Japan Beyond, a tour company in Hokkaido.\n';
+  prompt += 'Extract fields and return ONLY valid JSON (no markdown, no explanation):\n';
+  prompt += '{"ota":"","resNo":"","guest":"","tour":"","date":"YYYY-MM-DD","vehicle":"","price":0,"pax":0,"carSeat":0,"pickup":"","dropoff":"","status":"confirmed","memo":"","pickupTime":"HH:MM"}\n';
+  prompt += 'Rules: empty string for missing text, 0 for missing numbers. Detect OTA from email content or sender domain. Email may be in KO/JA/EN/FR or any language.\n';
+  prompt += 'Extract pickup time if mentioned (format HH:MM). Put remaining useful info in memo.\n\n';
+  prompt += 'Email:\n' + body;
+
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + gkey;
+
+  fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      contents: [{parts: [{text: prompt}]}],
+      generationConfig: {temperature: 0.1, maxOutputTokens: 1024}
+    })
+  })
+  .then(function(resp) { return resp.json(); })
+  .then(function(json) {
+    var text = json.candidates[0].content.parts[0].text;
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    var parsed = JSON.parse(text);
+    closeModal();
+    applyParsedReservation(parsed);
+  })
+  .catch(function(err) {
+    status.textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = t('parseEmail');
+  });
+}
+
+function applyParsedReservation(parsed) {
+  var otas = data.otas || [];
+  var otaId = '';
+  var otaName = (parsed.ota || '').toLowerCase();
+  for(var i=0;i<otas.length;i++){
+    if(otas[i].name.toLowerCase() === otaName) { otaId = otas[i].id; break; }
+  }
+
+  var r = {
+    id: genId(),
+    otaId: otaId,
+    bookingNo: parsed.resNo || '',
+    guest: parsed.guest || '',
+    tour: parsed.tour || '',
+    date: parsed.date || '',
+    pickupTime: parsed.pickupTime || '',
+    vehicle: parsed.vehicle || '',
+    price: 0,
+    pax: parseInt(parsed.pax) || 0,
+    carSeat: parseInt(parsed.carSeat) || 0,
+    pickup: parsed.pickup || '',
+    dropoff: parsed.dropoff || '',
+    email: parsed.email || '',
+    phone: parsed.phone || '',
+    status: parsed.status || 'confirmed',
+    notes: parsed.memo || '',
+    driver: '',
+    driverPhone: ''
+  };
+
+  var calc = matchProductPrice(otaId, r.tour, r.vehicle);
+  if(calc) r.price = calc.net;
+
+  if(!data.reservations) data.reservations = [];
+
+  var exists = false;
+  if(r.bookingNo) {
+    for(var i=0;i<data.reservations.length;i++){
+      if(data.reservations[i].bookingNo === r.bookingNo) { exists = true; break; }
+    }
+  }
+  if(exists) {
+    showPopup(t('bookingNo') + ' ' + r.bookingNo + ' — already exists');
+    return;
+  }
+
+  data.reservations.push(r);
+  saveData();
+  renderMain();
+  showPopup(r.guest + ' / ' + r.tour + ' — OK');
+}
+
+/* ===== CSV EXPORT ===== */
+function exportCsv() {
+  var res = getFilteredRes();
+  var headers = [t('ota'),t('bookingNo'),t('guest'),t('tour'),t('date'),t('vehicle'),t('priceField'),t('pax'),t('status'),t('pickup'),t('dropoff'),t('email'),t('phone'),t('notes')];
+  var csvRows = [headers.join(',')];
+  res.forEach(function(r){
+    var row = [
+      '"'+getOtaName(r.otaId)+'"',
+      '"'+(r.bookingNo||'')+'"',
+      '"'+(r.guest||'')+'"',
+      '"'+(r.tour||'')+'"',
+      r.date||'',
+      '"'+(r.vehicle||'')+'"',
+      r.price||0,
+      r.pax||0,
+      '"'+getStatusText(r.status)+'"',
+      '"'+(r.pickup||'')+'"',
+      '"'+(r.dropoff||'')+'"',
+      '"'+(r.email||'')+'"',
+      '"'+(r.phone||'')+'"',
+      '"'+(r.notes||'').replace(/"/g,'""')+'"'
+    ];
+    csvRows.push(row.join(','));
+  });
+  var csvContent = '﻿' + csvRows.join('\n');
+  var blob = new Blob([csvContent], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'reservations_' + todayStr() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ===== STATISTICS TAB ===== */
+function renderStatsTab() {
+  var reservations = data.reservations || [];
+  var otas = data.otas || [];
+  var totalRes = reservations.length;
+  var totalNet = 0;
+  var totalGross = 0;
+  var totalPax = 0;
+  reservations.forEach(function(r){
+    var net = r.price || 0;
+    totalNet += net;
+    totalPax += (r.pax||0);
+    var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
+    if(calc) {
+      totalGross += calc.gross;
+    } else {
+      totalGross += net;
+    }
+  });
+  var totalComm = totalGross - totalNet;
+
+  var h = '<div class="fade-in">';
+  h += '<div class="summary-cards">';
+  h += summaryCard('', t('totalReservations'), totalRes);
+  h += summaryCard('', t('grossPrice'), fmtYen(totalGross));
+  var netCard = '<div class="summary-card">';
+  netCard += '<div class="value">' + fmtYen(totalNet) + '</div>';
+  netCard += '<div class="label">' + t('netRevenue') + '</div>';
+  netCard += '<div class="sub">' + t('commissionAmt') + ': ' + fmtYen(totalComm) + '</div>';
+  netCard += '</div>';
+  h += netCard;
+  h += summaryCard('', t('totalGuests'), totalPax);
+  h += '</div>';
+
+  h += '<div class="stats-grid">';
+  h += chartCard('chartResByOta', t('chartResByOta'), 'doughnut');
+  h += chartCard('chartRevByOta', t('chartRevByOta'), '');
+  h += chartCard('chartByStatus', t('chartByStatus'), '');
+  h += chartCard('chartRevByTour', t('chartRevByTour'), '');
+  h += chartCard('chartResByTour', t('chartResByTour'), '');
+  h += chartCard('chartMonthly', t('chartMonthly'), '');
+  h += '</div></div>';
+
+  document.getElementById('mainArea').innerHTML = h;
+  setTimeout(function(){ renderCharts(); }, 50);
+}
+
+function chartCard(canvasId, title, extraClass) {
+  var cls = extraClass === 'doughnut' ? 'chart-wrap doughnut' : 'chart-wrap';
+  var h = '<div class="chart-card">';
+  h += '<h3>' + title + '</h3>';
+  h += '<div class="' + cls + '"><canvas id="' + canvasId + '"></canvas></div>';
+  h += '</div>';
+  return h;
+}
+
+/* ===== CHARTS ===== */
+function destroyCharts() {
+  chartInstances.forEach(function(c){ if(c) c.destroy(); });
+  chartInstances = [];
+}
+
+function renderCharts() {
+  destroyCharts();
+  var reservations = data.reservations || [];
+  var otas = data.otas || [];
+
+  var otaResCount = {};
+  var otaRevSum = {};
+  var statusCount = {confirmed:0,pending:0,cancelled:0,completed:0};
+  var tourRevSum = {};
+  var tourResCount = {};
+  var monthlyRev = {};
+
+  reservations.forEach(function(r){
+    var oid = r.otaId || 'unknown';
+    otaResCount[oid] = (otaResCount[oid]||0) + 1;
+    otaRevSum[oid] = (otaRevSum[oid]||0) + (r.price||0);
+    if(r.status && statusCount.hasOwnProperty(r.status)) statusCount[r.status]++;
+    var tour = r.tour || 'Other';
+    tourRevSum[tour] = (tourRevSum[tour]||0) + (r.price||0);
+    tourResCount[tour] = (tourResCount[tour]||0) + 1;
+    if(r.date){
+      var ym = r.date.substring(0,7);
+      monthlyRev[ym] = (monthlyRev[ym]||0) + (r.price||0);
+    }
+  });
+
+  var otaLabels = [];
+  var otaColors = [];
+  var otaResData = [];
+  var otaRevData = [];
+  otas.forEach(function(o){
+    otaLabels.push(o.name);
+    otaColors.push(o.color);
+    otaResData.push(otaResCount[o.id]||0);
+    otaRevData.push(otaRevSum[o.id]||0);
+  });
+
+  createChart('chartResByOta', 'doughnut', {
+    labels: otaLabels,
+    datasets: [{data:otaResData, backgroundColor:otaColors, borderWidth:2, borderColor:'#fff'}]
+  }, {responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}});
+
+  createChart('chartRevByOta', 'bar', {
+    labels: otaLabels,
+    datasets: [{label:t('totalRevenue'), data:otaRevData, backgroundColor:otaColors}]
+  }, {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{y:{ticks:{callback:function(v){return '¥'+v.toLocaleString();}}}}});
+
+  var statusLabels = [t('confirmed'),t('pending'),t('cancelled'),t('completed')];
+  var statusData = [statusCount.confirmed,statusCount.pending,statusCount.cancelled,statusCount.completed];
+  var statusColors = ['#2D9B4E','#E8A838','#D94848','#888'];
+  createChart('chartByStatus', 'bar', {
+    labels: statusLabels,
+    datasets: [{label:t('status'), data:statusData, backgroundColor:statusColors}]
+  }, {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}});
+
+  var tourNames = Object.keys(tourRevSum);
+  var tourRevArr = tourNames.map(function(t){return tourRevSum[t];});
+  createChart('chartRevByTour', 'bar', {
+    labels: tourNames,
+    datasets: [{label:t('totalRevenue'), data:tourRevArr, backgroundColor:'#C45D3E'}]
+  }, {responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}},
+    scales:{x:{ticks:{callback:function(v){return '¥'+v.toLocaleString();}}}}});
+
+  var tourResArr = tourNames.map(function(t){return tourResCount[t];});
+  createChart('chartResByTour', 'bar', {
+    labels: tourNames,
+    datasets: [{label:t('reservations'), data:tourResArr, backgroundColor:'#4A90D9'}]
+  }, {responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}}});
+
+  var monthKeys = Object.keys(monthlyRev).sort();
+  var monthData = monthKeys.map(function(k){return monthlyRev[k];});
+  createChart('chartMonthly', 'line', {
+    labels: monthKeys,
+    datasets: [{label:t('totalRevenue'), data:monthData, borderColor:'#C45D3E', backgroundColor:'rgba(196,93,62,0.1)', fill:true, tension:0.3}]
+  }, {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{y:{ticks:{callback:function(v){return '¥'+v.toLocaleString();}}}}});
+}
+
+function createChart(canvasId, type, chartData, chartOptions) {
+  var el = document.getElementById(canvasId);
+  if(!el) return;
+  var ctx = el.getContext('2d');
+  var c = new Chart(ctx, {type:type, data:chartData, options:chartOptions});
+  chartInstances.push(c);
+}
+
+/* ===== SYNC ===== */
+var DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwQ-ZfnH-gcBUzoJ4JBshtoAoHE2-5O_ey-GEzLUOPkBurT4cm3ERhYS2IxZWJJnVP8/exec';
+var DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6Ln7C5WUMsRTycDPtzjrkTAg_2TYInb20DefdI7g55rBw';
+function getSyncUrl() { return localStorage.getItem('jb-sync-url') || DEFAULT_SYNC_URL; }
+function getGeminiKey() { return localStorage.getItem('jb-gemini-key') || DEFAULT_GEMINI_KEY; }
+function setSyncUrl(url) { localStorage.setItem('jb-sync-url', url); }
+
+function showSyncSettings() {
+  var url = getSyncUrl();
+  var gkey = getGeminiKey();
+  var h = '';
+  h += '<div class="modal-header"><h2>' + t('syncSettings') + '</h2>';
+  h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
+  h += '<div class="modal-body">';
+  h += formGroup(t('webAppUrl'), '<input id="sync-url" value="' + escHtml(url) + '" placeholder="https://script.google.com/...">');
+  h += '<button class="btn btn-accent btn-sm" onclick="saveSyncUrl()" style="margin-bottom:20px">' + t('saveUrl') + '</button>';
+  h += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">';
+  h += formGroup(t('geminiKey'), '<input id="gemini-key" type="password" value="' + escHtml(gkey) + '" placeholder="AIza...">');
+  h += '<button class="btn btn-accent btn-sm" onclick="saveGeminiKey()" style="margin-bottom:20px">' + t('save') + '</button>';
+  h += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">';
+  h += '<div style="font-weight:700;margin-bottom:8px">' + t('manualImport') + '</div>';
+  h += formGroup('', '<textarea id="sync-json" rows="6" placeholder="' + t('pasteJson') + '"></textarea>');
+  h += '<button class="btn btn-outline btn-sm" onclick="importJson()">' + t('importJson') + '</button>';
+  h += '</div>';
+  showModal(h, false);
+}
+
+function saveSyncUrl() {
+  var url = document.getElementById('sync-url').value.trim();
+  setSyncUrl(url);
+  if(url) startPolling(); else stopPolling();
+  closeModal();
+  renderHeader();
+}
+
+function importJson() {
+  var raw = document.getElementById('sync-json').value.trim();
+  if(!raw) { showPopup('No data'); return; }
+  try {
+    var imported = JSON.parse(raw);
+    if(imported.otas) data.otas = imported.otas;
+    if(imported.reservations) {
+      data.reservations = mergeServerReservations(imported.reservations);
+    }
+    if(!data.otas) data.otas = [];
+    if(!data.reservations) data.reservations = [];
+    mapApiData();
+    localStorage.setItem('jb-ota-data', JSON.stringify(data));
+    closeModal();
+    renderAll();
+    showPopup('Import OK: ' + (data.reservations||[]).length + ' reservations');
+  } catch(e) {
+    showPopup('Error: ' + e.message);
+  }
+}
+
+function mapApiData() {
+  var otas = data.otas || [];
+  var reservations = data.reservations || [];
+  var nameToId = {};
+  otas.forEach(function(o){ nameToId[o.name.toLowerCase()] = o.id; });
+  reservations.forEach(function(r){
+    if(r.resNo && !r.bookingNo) { r.bookingNo = r.resNo; delete r.resNo; }
+    if(r.memo !== undefined && r.notes === undefined) { r.notes = r.memo; delete r.memo; }
+    if(!r.id) r.id = genId();
+    if(r.ota && !r.otaId) {
+      var mapped = nameToId[(r.ota+'').toLowerCase()];
+      if(mapped) r.otaId = mapped;
+      delete r.ota;
+    }
+    if(r.otaName && !r.otaId) {
+      var mapped = nameToId[r.otaName.toLowerCase()];
+      if(mapped) r.otaId = mapped;
+      delete r.otaName;
+    }
+    if(r.date && r.date.indexOf('T') >= 0) {
+      var d = new Date(r.date);
+      d.setMinutes(d.getMinutes() + d.getTimezoneOffset() + 540);
+      r.date = fmtDate(d);
+    }
+    if(r.pax) r.pax = parseInt(r.pax) || 0;
+    if(r.price) r.price = parseInt(r.price) || 0;
+    if(r.carSeat === undefined) r.carSeat = 0;
+    if(!r.pickup) r.pickup = '';
+    if(!r.dropoff) r.dropoff = '';
+    if(!r.email) r.email = '';
+    if(!r.phone) r.phone = '';
+    if(!r.status) r.status = 'confirmed';
+    if(!r.pickupTime && r.notes) {
+      var tm = (r.notes||'').match(/[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*(\d{1,2}[:\.]?\d{2})/);
+      if(tm) r.pickupTime = tm[1].replace('.', ':');
+    }
+    if(!r.pickupTime && r.memo) {
+      var tm2 = (r.memo||'').match(/[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*(\d{1,2}[:\.]?\d{2})/);
+      if(tm2) r.pickupTime = tm2[1].replace('.', ':');
+    }
+    if(!r.price || r.price === 0) {
+      var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
+      if(calc) r.price = calc.net;
+    }
+  });
+}
+
+function mergeServerReservations(serverRes) {
+  var existing = data.reservations || [];
+  var existingByNo = {};
+  existing.forEach(function(r){ if(r.bookingNo) existingByNo[r.bookingNo] = r; });
+  var merged = existing.slice();
+  serverRes.forEach(function(sr){
+    var key = sr.resNo || sr.bookingNo || '';
+    if(key && existingByNo[key]) {
+      var ex = existingByNo[key];
+      if(sr.status) ex.status = sr.status;
+      if(sr.memo !== undefined) ex.notes = sr.memo || sr.notes || ex.notes;
+    } else {
+      merged.push(sr);
+    }
+  });
+  return merged;
+}
+
+function doSync() {
+  var url = getSyncUrl();
+  if(!url) { showSyncSettings(); return; }
+  syncConnected = false;
+  renderHeader();
+  fetch(url, {redirect:'follow'})
+    .then(function(resp){
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    })
+    .then(function(json){
+      if(json.otas) data.otas = json.otas;
+      if(json.reservations) {
+        data.reservations = mergeServerReservations(json.reservations);
+      }
+      if(!data.otas) data.otas = [];
+      if(!data.reservations) data.reservations = [];
+      mapApiData();
+      localStorage.setItem('jb-ota-data', JSON.stringify(data));
+      syncConnected = true;
+      renderAll();
+    })
+    .catch(function(err){
+      syncConnected = false;
+      renderHeader();
+      showPopup('Sync failed: ' + err.message);
+    });
+}
+
+function syncToServer() {
+  var url = getSyncUrl();
+  if(!url) return;
+  var payload = JSON.stringify({
+    action: 'saveAll',
+    otas: data.otas || [],
+    reservations: data.reservations || []
+  });
+  fetch(url, {
+    method: 'POST',
+    body: payload,
+    redirect: 'follow'
+  }).then(function(resp){
+    syncConnected = true;
+    renderHeader();
+  }).catch(function(err){
+    console.error('Sync POST error:', err);
+  });
+}
+
+function startPolling() {
+  stopPolling();
+  var url = getSyncUrl();
+  if(!url) return;
+  syncInterval = setInterval(function(){
+    var u = getSyncUrl();
+    if(!u) { stopPolling(); return; }
+    fetch(u, {redirect:'follow'})
+      .then(function(resp){
+        if(!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function(json){
+        if(json.otas) data.otas = json.otas;
+        if(json.reservations) {
+          data.reservations = mergeServerReservations(json.reservations);
+        }
+        if(!data.otas) data.otas = [];
+        if(!data.reservations) data.reservations = [];
+        mapApiData();
+        localStorage.setItem('jb-ota-data', JSON.stringify(data));
+        syncConnected = true;
+        renderAll();
+      })
+      .catch(function(err){
+        syncConnected = false;
+        renderHeader();
+      });
+  }, 15000);
+}
+
+function stopPolling() {
+  if(syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+}
+
+/* ===== LANGUAGE ===== */
+function changeLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('jb-lang', lang);
+  document.documentElement.lang = lang === 'ja' ? 'ja' : lang === 'ko' ? 'ko' : 'en';
+  renderAll();
+}
+
+/* ===== RENDER ALL ===== */
+function renderAll() {
+  renderHeader();
+  renderTabs();
+  renderMain();
+}
+
+/* ===== INIT ===== */
+function init() {
+  loadData();
+  renderAll();
+  if(getSyncUrl()) startPolling();
+}
+
+init();
+</script>
+</body>
+</html>

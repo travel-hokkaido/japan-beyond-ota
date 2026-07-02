@@ -97,8 +97,8 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-seri
 
 /* === TABLE === */
 .table-wrap{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);overflow:hidden}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:var(--bg);padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{background:var(--bg);padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis}
 td{padding:10px 12px;border-bottom:1px solid var(--border-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 tr.clickable{cursor:pointer;transition:background .15s}
 tr.clickable:hover{background:var(--accent-bg)}
@@ -490,8 +490,6 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem('jb-ota-data', JSON.stringify(data));
-  localDirty = true;
-  try { syncToServer(); } catch(e) {}
 }
 
 /* ===== UTILS ===== */
@@ -1078,6 +1076,7 @@ function saveProduct(e, otaId, productId) {
     o.products.push({id:genId(), name:name, url:url, status:status, commission:commission, options:options});
   }
   saveData();
+  sbUpsertOta(o);
   showOtaDetail(otaId);
 }
 
@@ -1087,6 +1086,7 @@ function deleteProduct(otaId, productId) {
     if(!o) return;
     o.products = (o.products||[]).filter(function(p){return p.id!==productId;});
     saveData();
+    sbUpsertOta(o);
     showOtaDetail(otaId);
   });
 }
@@ -1108,6 +1108,7 @@ function copyProduct(otaId, productId) {
   };
   o.products.push(copy);
   saveData();
+  sbUpsertOta(o);
   showOtaDetail(otaId);
 }
 
@@ -1169,13 +1170,16 @@ function saveOta(e, otaId) {
     if(o){
       o.name=name; o.commission=comm; o.market=market; o.url=url;
       o.loginId=lid; o.password=pw; o.emailDomain=em; o.color=color;
+      sbUpsertOta(o);
     }
   } else {
     var newId = name.toLowerCase().replace(/[^a-z0-9]/g,'') + Date.now().toString(36);
-    data.otas.push({
+    var newOta = {
       id:newId, name:name, commission:comm, market:market, url:url,
       loginId:lid, password:pw, emailDomain:em, color:color, products:[]
-    });
+    };
+    data.otas.push(newOta);
+    sbUpsertOta(newOta);
   }
   saveData();
   closeModal();
@@ -1186,6 +1190,7 @@ function deleteOta(otaId) {
   showConfirm(t('confirmDel'), function(){
     data.otas = (data.otas||[]).filter(function(o){return o.id!==otaId;});
     saveData();
+    sbDeleteOta(otaId);
     renderOtaTab();
   });
 }
@@ -1488,6 +1493,7 @@ function saveRes(e, resId) {
     data.reservations.push(obj);
   }
   saveData();
+  sbUpsertReservation(obj);
   closeModal();
   renderMain();
 }
@@ -1495,14 +1501,9 @@ function saveRes(e, resId) {
 function deleteRes(resId) {
   showConfirm(t('confirmDel'), function(){
     var res = data.reservations || [];
-    for(var i=0;i<res.length;i++){
-      if(res[i].id===resId && res[i].bookingNo) {
-        deletedBookingNos.push(res[i].bookingNo);
-        break;
-      }
-    }
     data.reservations = res.filter(function(r){return r.id!==resId;});
     saveData();
+    sbDeleteReservation(resId);
     closeModal();
     renderMain();
   });
@@ -1792,234 +1793,222 @@ function createChart(canvasId, type, chartData, chartOptions) {
   chartInstances.push(c);
 }
 
-/* ===== SYNC ===== */
-var DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbwQ-ZfnH-gcBUzoJ4JBshtoAoHE2-5O_ey-GEzLUOPkBurT4cm3ERhYS2IxZWJJnVP8/exec';
-function getSyncUrl() { return localStorage.getItem('jb-sync-url') || DEFAULT_SYNC_URL; }
-function setSyncUrl(url) { localStorage.setItem('jb-sync-url', url); }
+/* ===== SUPABASE SYNC ===== */
+var SUPABASE_URL = 'https://hiyzbijlumuwzchwccvd.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_GQxj1BgyS4pYxHDQmEn6WA_BZZA_ZYR';
+
+function sbHeaders(extra) {
+  var h = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json'
+  };
+  if(extra) { for(var k in extra) h[k] = extra[k]; }
+  return h;
+}
+
+function resToRow(r) {
+  return {
+    id: r.id,
+    ota_id: r.otaId || '',
+    booking_no: r.bookingNo || '',
+    guest: r.guest || '',
+    tour: r.tour || '',
+    date: r.date || '',
+    pickup_time: r.pickupTime || '',
+    vehicle: r.vehicle || '',
+    price: r.price || 0,
+    pax: r.pax || 0,
+    car_seat: r.carSeat || 0,
+    pickup: r.pickup || '',
+    dropoff: r.dropoff || '',
+    email: r.email || '',
+    phone: r.phone || '',
+    status: r.status || 'confirmed',
+    notes: r.notes || '',
+    driver: r.driver || '',
+    driver_phone: r.driverPhone || ''
+  };
+}
+
+function rowToRes(row) {
+  return {
+    id: row.id,
+    otaId: row.ota_id || '',
+    bookingNo: row.booking_no || '',
+    guest: row.guest || '',
+    tour: row.tour || '',
+    date: row.date || '',
+    pickupTime: row.pickup_time || '',
+    vehicle: row.vehicle || '',
+    price: Number(row.price) || 0,
+    pax: Number(row.pax) || 0,
+    carSeat: Number(row.car_seat) || 0,
+    pickup: row.pickup || '',
+    dropoff: row.dropoff || '',
+    email: row.email || '',
+    phone: row.phone || '',
+    status: row.status || 'confirmed',
+    notes: row.notes || '',
+    driver: row.driver || '',
+    driverPhone: row.driver_phone || ''
+  };
+}
+
+function otaToRow(o) {
+  return {
+    id: o.id,
+    name: o.name || '',
+    commission: o.commission || 20,
+    market: o.market || '',
+    url: o.url || '',
+    login_id: o.loginId || '',
+    password: o.password || '',
+    email_domain: o.emailDomain || '',
+    color: o.color || '#888',
+    products: o.products || []
+  };
+}
+
+function rowToOta(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    commission: Number(row.commission) || 20,
+    market: row.market || '',
+    url: row.url || '',
+    loginId: row.login_id || '',
+    password: row.password || '',
+    emailDomain: row.email_domain || '',
+    color: row.color || '#888',
+    products: row.products || []
+  };
+}
+
+/* fetch all data from Supabase */
+function fetchAll(onDone) {
+  var resUrl = SUPABASE_URL + '/rest/v1/reservations?select=*';
+  var otaUrl = SUPABASE_URL + '/rest/v1/otas?select=*';
+  Promise.all([
+    fetch(resUrl, {headers: sbHeaders()}).then(function(r){ return r.json(); }),
+    fetch(otaUrl, {headers: sbHeaders()}).then(function(r){ return r.json(); })
+  ]).then(function(results){
+    var resRows = results[0] || [];
+    var otaRows = results[1] || [];
+    if(otaRows.length > 0) {
+      data.otas = otaRows.map(rowToOta);
+    }
+    data.reservations = resRows.map(rowToRes);
+    if(!data.otas) data.otas = [];
+    if(!data.reservations) data.reservations = [];
+    localStorage.setItem('jb-ota-data', JSON.stringify(data));
+    syncConnected = true;
+    if(onDone) onDone(true);
+  }).catch(function(err){
+    syncConnected = false;
+    renderHeader();
+    if(onDone) onDone(false, err);
+  });
+}
+
+/* upsert a single reservation */
+function sbUpsertReservation(r) {
+  var url = SUPABASE_URL + '/rest/v1/reservations?on_conflict=id';
+  return fetch(url, {
+    method: 'POST',
+    headers: sbHeaders({'Prefer': 'resolution=merge-duplicates'}),
+    body: JSON.stringify(resToRow(r))
+  });
+}
+
+/* delete a single reservation */
+function sbDeleteReservation(id) {
+  var url = SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(id);
+  return fetch(url, {method: 'DELETE', headers: sbHeaders()});
+}
+
+/* upsert a single OTA */
+function sbUpsertOta(o) {
+  var url = SUPABASE_URL + '/rest/v1/otas?on_conflict=id';
+  return fetch(url, {
+    method: 'POST',
+    headers: sbHeaders({'Prefer': 'resolution=merge-duplicates'}),
+    body: JSON.stringify(otaToRow(o))
+  });
+}
+
+/* delete a single OTA */
+function sbDeleteOta(id) {
+  var url = SUPABASE_URL + '/rest/v1/otas?id=eq.' + encodeURIComponent(id);
+  return fetch(url, {method: 'DELETE', headers: sbHeaders()});
+}
+
+/* manual sync button */
+function doSync() {
+  syncConnected = false;
+  renderHeader();
+  fetchAll(function(ok, err){
+    if(ok) { renderAll(); }
+    else { showPopup('Sync failed: ' + (err ? err.message : '')); }
+  });
+}
 
 function showSyncSettings() {
-  var url = getSyncUrl();
   var h = '';
   h += '<div class="modal-header"><h2>' + t('syncSettings') + '</h2>';
   h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
   h += '<div class="modal-body">';
-  h += formGroup(t('webAppUrl'), '<input id="sync-url" value="' + escHtml(url) + '" placeholder="https://script.google.com/...">');
-  h += '<button class="btn btn-accent btn-sm" onclick="saveSyncUrl()" style="margin-bottom:20px">' + t('saveUrl') + '</button>';
-  h += '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">';
-  h += '<div style="font-weight:700;margin-bottom:8px">' + t('manualImport') + '</div>';
-  h += formGroup('', '<textarea id="sync-json" rows="6" placeholder="' + t('pasteJson') + '"></textarea>');
-  h += '<button class="btn btn-outline btn-sm" onclick="importJson()">' + t('importJson') + '</button>';
+  h += '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Supabase connected.</div>';
+  h += '<div style="font-size:12px;color:var(--text2);word-break:break-all;margin-bottom:20px">' + escHtml(SUPABASE_URL) + '</div>';
+  h += '<button class="btn btn-accent btn-sm" onclick="doSync();closeModal()">' + t('sync') + '</button>';
   h += '</div>';
   showModal(h, false);
 }
 
-function saveSyncUrl() {
-  var url = document.getElementById('sync-url').value.trim();
-  setSyncUrl(url);
-  if(url) startPolling(); else stopPolling();
-  closeModal();
-  renderHeader();
-}
-
-function importJson() {
-  var raw = document.getElementById('sync-json').value.trim();
-  if(!raw) { showPopup('No data'); return; }
-  try {
-    var imported = JSON.parse(raw);
-    if(imported.otas) data.otas = imported.otas;
-    if(imported.reservations) {
-      data.reservations = mergeServerReservations(imported.reservations);
-    }
-    if(!data.otas) data.otas = [];
-    if(!data.reservations) data.reservations = [];
-    mapApiData();
-    saveData();
-    closeModal();
-    renderAll();
-    showPopup('Import OK: ' + (data.reservations||[]).length + ' reservations');
-  } catch(e) {
-    showPopup('Error: ' + e.message);
-  }
-}
-
-function mapApiData() {
-  var otas = data.otas || [];
-  var reservations = data.reservations || [];
-  var nameToId = {};
-  otas.forEach(function(o){ nameToId[o.name.toLowerCase()] = o.id; });
-  reservations.forEach(function(r){
-    if(r.resNo && !r.bookingNo) { r.bookingNo = r.resNo; delete r.resNo; }
-    if(r.memo !== undefined && r.notes === undefined) { r.notes = r.memo; delete r.memo; }
-    if(!r.id) r.id = genId();
-    if(r.ota && !r.otaId) {
-      var mapped = nameToId[(r.ota+'').toLowerCase()];
-      if(mapped) r.otaId = mapped;
-      delete r.ota;
-    }
-    if(r.otaName && !r.otaId) {
-      var mapped = nameToId[r.otaName.toLowerCase()];
-      if(mapped) r.otaId = mapped;
-      delete r.otaName;
-    }
-    if(r.date && r.date.indexOf('T') >= 0) {
-      var d = new Date(r.date);
-      d.setMinutes(d.getMinutes() + d.getTimezoneOffset() + 540);
-      r.date = fmtDate(d);
-    }
-    if(r.pickupTime && r.pickupTime.length > 5) {
-      var ptMatch = r.pickupTime.match(/(\d{1,2}):(\d{2}):\d{2}/);
-      if(ptMatch) r.pickupTime = ptMatch[1].padStart(2,'0') + ':' + ptMatch[2];
-      else r.pickupTime = '';
-    }
-    if(r.pax) r.pax = parseInt(r.pax) || 0;
-    if(r.price) r.price = parseInt(r.price) || 0;
-    if(r.carSeat === undefined) r.carSeat = 0;
-    if(!r.pickup) r.pickup = '';
-    if(!r.dropoff) r.dropoff = '';
-    if(!r.email) r.email = '';
-    if(!r.phone) r.phone = '';
-    if(!r.status) r.status = 'confirmed';
-    var ptRegex = /,?\s*[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*\d{1,2}[:\.]?\d{2}\s*,?/;
-    if(!r.pickupTime && r.notes) {
-      var tm = (r.notes||'').match(/[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*(\d{1,2}[:\.]?\d{2})/);
-      if(tm) {
-        r.pickupTime = tm[1].replace('.', ':');
-        r.notes = r.notes.replace(ptRegex, '').trim();
-      }
-    }
-    if(!r.pickupTime && r.memo) {
-      var tm2 = (r.memo||'').match(/[Pp]ick[\-\s]?up\s*(?:time)?[:\s]*(\d{1,2}[:\.]?\d{2})/);
-      if(tm2) {
-        r.pickupTime = tm2[1].replace('.', ':');
-        r.memo = r.memo.replace(ptRegex, '').trim();
-      }
-    }
-    if(!r.price || r.price === 0) {
-      var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
-      if(calc) r.price = calc.net;
-    }
-  });
-}
-
-function mergeServerReservations(serverRes) {
-  return serverRes;
-}
-
-function doSync() {
-  var url = getSyncUrl();
-  if(!url) { showSyncSettings(); return; }
-  syncConnected = false;
-  renderHeader();
-  fetch(url, {redirect:'follow'})
-    .then(function(resp){
-      if(!resp.ok) throw new Error('HTTP ' + resp.status);
-      return resp.json();
-    })
-    .then(function(json){
-      if(json.otas && json.otas.length > 0) data.otas = json.otas;
-      if(json.reservations) {
-        data.reservations = mergeServerReservations(json.reservations);
-        mapApiData();
-      }
-      if(!data.otas) data.otas = [];
-      if(!data.reservations) data.reservations = [];
-      localStorage.setItem('jb-ota-data', JSON.stringify(data));
-      syncConnected = true;
-      localDirty = false;
-      renderAll();
-    })
-    .catch(function(err){
-      syncConnected = false;
-      renderHeader();
-      showPopup('Sync failed: ' + err.message);
-    });
-}
-
-function syncToServer() {
-  var url = getSyncUrl();
-  if(!url) return;
-  var resForServer = (data.reservations || []).map(function(r){
-    return {
-      id: r.id || '',
-      ota: getOtaName(r.otaId) || r.otaId || '',
-      resNo: r.bookingNo || '',
-      guest: r.guest || '',
-      tour: r.tour || '',
-      date: r.date || '',
-      vehicle: r.vehicle || '',
-      price: r.price || 0,
-      pax: r.pax || 0,
-      carSeat: r.carSeat || 0,
-      pickup: r.pickup || '',
-      dropoff: r.dropoff || '',
-      status: r.status || 'confirmed',
-      memo: r.notes || '',
-      pickupTime: r.pickupTime || '',
-      driver: r.driver || '',
-      driverPhone: r.driverPhone || ''
-    };
-  });
-  var payload = JSON.stringify({
-    action: 'saveAll',
-    otas: data.otas || [],
-    reservations: resForServer
-  });
-  fetch(url, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: {'Content-Type': 'text/plain'},
-    body: payload
-  }).then(function(){
-    syncConnected = true;
-    setTimeout(function(){ localDirty = false; }, 20000);
-    renderHeader();
-  }).catch(function(err){
-    console.error('Sync POST error:', err);
-  });
-}
-
 function startPolling() {
   stopPolling();
-  var url = getSyncUrl();
-  if(!url) return;
   syncInterval = setInterval(function(){
     if(localDirty) return;
-    var u = getSyncUrl();
-    if(!u) { stopPolling(); return; }
-    fetch(u, {redirect:'follow'})
-      .then(function(resp){
-        if(!resp.ok) throw new Error('HTTP ' + resp.status);
-        return resp.json();
-      })
-      .then(function(json){
-        if(localDirty) return;
-        var oldHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
-        if(json.otas && json.otas.length > 0) data.otas = json.otas;
-        if(json.reservations) {
-          data.reservations = mergeServerReservations(json.reservations);
-          mapApiData();
-        }
-        if(!data.otas) data.otas = [];
-        if(!data.reservations) data.reservations = [];
-        var newHash = JSON.stringify(data.reservations) + JSON.stringify(data.otas);
-        localStorage.setItem('jb-ota-data', JSON.stringify(data));
-        var wasConnected = syncConnected;
-        syncConnected = true;
-        if(newHash !== oldHash) {
-          renderAll();
-        } else if(!wasConnected) {
-          renderHeader();
-        }
-      })
-      .catch(function(err){
-        syncConnected = false;
-        renderHeader();
-      });
+    var oldHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
+    fetchAll(function(ok){
+      if(!ok) { renderHeader(); return; }
+      var newHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
+      if(newHash !== oldHash) renderAll();
+      else renderHeader();
+    });
   }, 15000);
 }
 
 function stopPolling() {
   if(syncInterval) { clearInterval(syncInterval); syncInterval = null; }
+}
+
+/* import JSON manually (one-time migration helper) */
+function importJson() {
+  var raw = document.getElementById('sync-json') ? document.getElementById('sync-json').value.trim() : '';
+  if(!raw) { showPopup('No data'); return; }
+  try {
+    var imported = JSON.parse(raw);
+    var otasList = imported.otas || [];
+    var resList = imported.reservations || [];
+    otasList.forEach(function(o){ sbUpsertOta(o); });
+    resList.forEach(function(r){
+      if(!r.id) r.id = genId();
+      if(r.resNo && !r.bookingNo) r.bookingNo = r.resNo;
+      if(r.memo !== undefined && r.notes === undefined) r.notes = r.memo;
+      if(r.ota && !r.otaId) {
+        var nm = {};
+        otasList.forEach(function(o){ nm[o.name.toLowerCase()] = o.id; });
+        if(nm[(r.ota+'').toLowerCase()]) r.otaId = nm[(r.ota+'').toLowerCase()];
+      }
+      sbUpsertReservation(r);
+    });
+    closeModal();
+    showPopup('Import sent: ' + resList.length + ' reservations');
+    setTimeout(doSync, 2000);
+  } catch(e) {
+    showPopup('Error: ' + e.message);
+  }
 }
 
 /* ===== LANGUAGE ===== */
@@ -2041,10 +2030,8 @@ function renderAll() {
 function init() {
   loadData();
   renderAll();
-  if(getSyncUrl()) {
-    doSync();
-    startPolling();
-  }
+  doSync();
+  startPolling();
 }
 
 init();

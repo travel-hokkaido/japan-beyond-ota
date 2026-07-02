@@ -541,28 +541,24 @@ function matchProductPrice(otaId, tourName, vehicle) {
   if(!tourName) return null;
   var otas = data.otas || [];
   var searchOtas = otaId ? otas.filter(function(o){return o.id===otaId;}) : otas;
-  var tn = tourName.toLowerCase();
-  var vn = (vehicle||'').toLowerCase();
+  var tn = tourName.trim().toLowerCase();
+  var vn = (vehicle||'').trim().toLowerCase();
   for(var i=0;i<searchOtas.length;i++){
     var prods = searchOtas[i].products || [];
     for(var j=0;j<prods.length;j++){
       var p = prods[j];
-      var pn = (p.name||'').toLowerCase();
-      if(tn.indexOf(pn)>=0 || pn.indexOf(tn)>=0 || fuzzyMatch(pn, tn)) {
+      var pn = (p.name||'').trim().toLowerCase();
+      var tourMatch = (tn === pn) || (tn.length>3 && pn.length>3 && (tn.indexOf(pn)>=0 || pn.indexOf(tn)>=0));
+      if(tourMatch) {
         var comm = p.commission !== undefined ? p.commission : searchOtas[i].commission;
         var opts = p.options || [];
         for(var k=0;k<opts.length;k++){
-          var on = (opts[k].name||'').toLowerCase();
-          if(vn && (vn.indexOf(on)>=0 || on.indexOf(vn)>=0)) {
+          var on = (opts[k].name||'').trim().toLowerCase();
+          if(vn && on === vn) {
             var gross = opts[k].price;
             var net = Math.round(gross * (100 - comm) / 100);
             return {gross:gross, commission:comm, net:net, productName:p.name, optionName:opts[k].name};
           }
-        }
-        if(opts.length>0) {
-          var gross = opts[0].price;
-          var net = Math.round(gross * (100 - comm) / 100);
-          return {gross:gross, commission:comm, net:net, productName:p.name, optionName:opts[0].name};
         }
       }
     }

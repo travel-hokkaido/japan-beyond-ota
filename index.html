@@ -300,7 +300,7 @@ var LANG = {
     driverVehicles: '運転可能車両', noDriver: '未配車', unassigned: '未配車',
     driverConflict: 'このドライバーは同日に他の予約があります',
     productCommission: '商品手数料(%)', grossPrice: '売上', netPrice: '実収入', autoCalc: '自動計算済み',
-    priceInputMode: '入力金額',
+    priceInputMode: '入力金額', allMonths: '全期間', monthFilter: '月別',
     geminiKey: 'Gemini API Key', pasteEmail: 'メール貼り付け',
     parseEmail: 'メールから予約登録', parsing: '解析中...',
     emailPlaceholder: '予約確認メールの本文を貼り付けてください'
@@ -358,7 +358,7 @@ var LANG = {
     driverVehicles: '운전 가능 차량', noDriver: '미배차', unassigned: '미배차',
     driverConflict: '이 드라이버는 같은 날 다른 예약이 있습니다',
     productCommission: '상품 수수료(%)', grossPrice: '매출', netPrice: '실수령', autoCalc: '자동 계산됨',
-    priceInputMode: '입력 금액',
+    priceInputMode: '입력 금액', allMonths: '전체 기간', monthFilter: '월별',
     geminiKey: 'Gemini API Key', pasteEmail: '메일 붙여넣기',
     parseEmail: '메일에서 예약 등록', parsing: '분석 중...',
     emailPlaceholder: '예약 확인 메일 본문을 붙여넣으세요'
@@ -416,7 +416,7 @@ var LANG = {
     driverVehicles: 'Vehicles', noDriver: 'Unassigned', unassigned: 'Unassigned',
     driverConflict: 'This driver has another booking on the same day',
     productCommission: 'Product Commission(%)', grossPrice: 'Gross', netPrice: 'Net', autoCalc: 'Auto-calculated',
-    priceInputMode: 'Price input',
+    priceInputMode: 'Price input', allMonths: 'All time', monthFilter: 'Month',
     geminiKey: 'Gemini API Key', pasteEmail: 'Paste Email',
     parseEmail: 'Register from Email', parsing: 'Parsing...',
     emailPlaceholder: 'Paste the booking confirmation email here'
@@ -435,6 +435,7 @@ var calMonth = new Date().getMonth();
 var searchQ = '';
 var filterOtaId = '';
 var showPastRes = false;
+var statsMonth = '';
 var chartInstances = [];
 var syncInterval = null;
 var syncConnected = false;
@@ -1423,8 +1424,9 @@ function showResForm(resId) {
   h += '<div id="driverConflictWarn" style="display:none;background:#FFFBEB;border:1px solid #FFE082;border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:12px;color:#92400E"></div>';
   h += '<div id="priceCalcInfo" style="display:none;background:var(--bg);border:1px solid var(--border-light);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px">';
   h += '</div>';
-  h += '<div class="form-row">';
-  h += formGroup(t('priceField') + ' (' + t('netPrice') + ')', '<input id="rf-price" type="number" value="' + (r?r.price:'') + '">');
+  h += '<div class="form-row-3">';
+  h += formGroup(t('grossPrice') + '(¥)', '<input id="rf-gross" type="number" value="' + (r?getResGross(r):'') + '" oninput="onGrossInput()">');
+  h += formGroup(t('netPrice') + '(¥)', '<input id="rf-price" type="number" value="' + (r?r.price:'') + '" readonly style="background:var(--bg)">');
   h += formGroup(t('pax'), '<input id="rf-pax" type="number" value="' + (r?r.pax:'') + '" min="0">');
   h += '</div>';
   h += formGroup(t('carSeat'), '<input id="rf-carseat" type="number" value="' + (r?r.carSeat:0) + '" min="0">');
@@ -1524,15 +1526,51 @@ function checkDriverConflict() {
   }
 }
 
+function getResCommission() {
+  var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
+  var tour = document.getElementById('rf-tour') ? document.getElementById('rf-tour').value.trim() : '';
+  var vehicle = document.getElementById('rf-vehicle') ? document.getElementById('rf-vehicle').value.trim() : '';
+  var result = matchProductPrice(otaId, tour, vehicle);
+  if(result) return result.commission;
+  var o = getOta(otaId);
+  return o ? o.commission : 20;
+}
+
+function getResGross(r) {
+  if(!r) return '';
+  var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
+  if(calc) return calc.gross;
+  return r.price || '';
+}
+
+function onGrossInput() {
+  var grossEl = document.getElementById('rf-gross');
+  var netEl = document.getElementById('rf-price');
+  if(!grossEl || !netEl) return;
+  var gross = parseInt(grossEl.value) || 0;
+  var comm = getResCommission();
+  var net = Math.round(gross * (100 - comm) / 100);
+  netEl.value = net;
+  var info = document.getElementById('priceCalcInfo');
+  if(info) {
+    info.style.display = 'block';
+    info.innerHTML = t('grossPrice') + ': ' + fmtYen(gross)
+      + ' - ' + t('commission') + ' ' + comm + '%'
+      + ' = <strong style="color:var(--accent)">' + t('netPrice') + ': ' + fmtYen(net) + '</strong>';
+  }
+}
+
 function autoCalcPrice() {
   var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
   var tour = document.getElementById('rf-tour') ? document.getElementById('rf-tour').value.trim() : '';
   var vehicle = document.getElementById('rf-vehicle') ? document.getElementById('rf-vehicle').value.trim() : '';
   var info = document.getElementById('priceCalcInfo');
   var priceInput = document.getElementById('rf-price');
+  var grossInput = document.getElementById('rf-gross');
   if(!tour) { if(info) info.style.display='none'; return; }
   var result = matchProductPrice(otaId, tour, vehicle);
   if(result) {
+    if(grossInput) grossInput.value = result.gross;
     if(priceInput) priceInput.value = result.net;
     if(info) {
       info.style.display = 'block';
@@ -1642,8 +1680,15 @@ function exportCsv() {
 
 /* ===== STATISTICS TAB ===== */
 function renderStatsTab() {
-  var reservations = data.reservations || [];
+  var allRes = data.reservations || [];
   var otas = data.otas || [];
+
+  var monthSet = {};
+  allRes.forEach(function(r){ if(r.date && r.date.length>=7) monthSet[r.date.substring(0,7)] = true; });
+  var monthKeys = Object.keys(monthSet).sort();
+
+  var reservations = statsMonth ? allRes.filter(function(r){ return (r.date||'').substring(0,7) === statsMonth; }) : allRes;
+
   var totalRes = reservations.length;
   var totalNet = 0;
   var totalGross = 0;
@@ -1662,6 +1707,15 @@ function renderStatsTab() {
   var totalComm = totalGross - totalNet;
 
   var h = '<div class="fade-in">';
+  h += '<div class="toolbar" style="margin-bottom:20px">';
+  h += '<span style="font-size:13px;color:var(--text2);font-weight:600">' + t('monthFilter') + '</span>';
+  h += '<select class="lang-select" onchange="setStatsMonth(this.value)">';
+  h += '<option value="">' + t('allMonths') + '</option>';
+  monthKeys.forEach(function(m){
+    h += '<option value="' + m + '"' + (statsMonth===m?' selected':'') + '>' + m + '</option>';
+  });
+  h += '</select>';
+  h += '</div>';
   h += '<div class="summary-cards">';
   h += summaryCard('', t('totalReservations'), totalRes);
   h += summaryCard('', t('grossPrice'), fmtYen(totalGross));
@@ -1687,6 +1741,11 @@ function renderStatsTab() {
   setTimeout(function(){ renderCharts(); }, 50);
 }
 
+function setStatsMonth(m) {
+  statsMonth = m;
+  renderStatsTab();
+}
+
 function chartCard(canvasId, title, extraClass) {
   var cls = extraClass === 'doughnut' ? 'chart-wrap doughnut' : 'chart-wrap';
   var h = '<div class="chart-card">';
@@ -1704,7 +1763,8 @@ function destroyCharts() {
 
 function renderCharts() {
   destroyCharts();
-  var reservations = data.reservations || [];
+  var allReservations = data.reservations || [];
+  var reservations = statsMonth ? allReservations.filter(function(r){ return (r.date||'').substring(0,7) === statsMonth; }) : allReservations;
   var otas = data.otas || [];
 
   var otaResCount = {};
@@ -1722,6 +1782,8 @@ function renderCharts() {
     var tour = r.tour || 'Other';
     tourRevSum[tour] = (tourRevSum[tour]||0) + (r.price||0);
     tourResCount[tour] = (tourResCount[tour]||0) + 1;
+  });
+  allReservations.forEach(function(r){
     if(r.date){
       var ym = r.date.substring(0,7);
       monthlyRev[ym] = (monthlyRev[ym]||0) + (r.price||0);

@@ -1959,6 +1959,15 @@ function fetchAll(onDone) {
     data.reservations = resRows.map(rowToRes);
     if(!data.otas) data.otas = [];
     if(!data.reservations) data.reservations = [];
+    data.reservations.forEach(function(r){
+      if(!r.price || r.price === 0) {
+        var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
+        if(calc) {
+          r.price = calc.net;
+          sbUpsertReservation(r);
+        }
+      }
+    });
     localStorage.setItem('jb-ota-data', JSON.stringify(data));
     syncConnected = true;
     if(onDone) onDone(true);

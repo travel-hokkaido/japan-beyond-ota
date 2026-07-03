@@ -538,12 +538,16 @@ function getDriverName(driver) {
   return driver || '';
 }
 
+function normOpt(s) {
+  return (s||'').toLowerCase().replace(/\s+/g,'').replace(/[（）]/g,function(m){return m==='（'?'(':')';}).replace(/[~〜～]/g,'~');
+}
+
 function matchProductPrice(otaId, tourName, vehicle) {
   if(!tourName) return null;
   var otas = data.otas || [];
   var searchOtas = otaId ? otas.filter(function(o){return o.id===otaId;}) : otas;
   var tn = tourName.trim().toLowerCase();
-  var vn = (vehicle||'').trim().toLowerCase();
+  var vn = normOpt(vehicle);
   for(var i=0;i<searchOtas.length;i++){
     var prods = searchOtas[i].products || [];
     for(var j=0;j<prods.length;j++){
@@ -554,8 +558,8 @@ function matchProductPrice(otaId, tourName, vehicle) {
         var comm = p.commission !== undefined ? p.commission : searchOtas[i].commission;
         var opts = p.options || [];
         for(var k=0;k<opts.length;k++){
-          var on = (opts[k].name||'').trim().toLowerCase();
-          if(vn && on === vn) {
+          var on = normOpt(opts[k].name);
+          if(vn && (on === vn || on.indexOf(vn)>=0 || vn.indexOf(on)>=0)) {
             var gross = opts[k].price;
             var net = Math.round(gross * (100 - comm) / 100);
             return {gross:gross, commission:comm, net:net, productName:p.name, optionName:opts[k].name};

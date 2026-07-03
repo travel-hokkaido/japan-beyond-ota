@@ -294,7 +294,7 @@ var LANG = {
     sync: '同期', settings: '設定', noData: 'データなし',
     marketKorea: '韓国', marketAsia: 'アジア', marketGlobal: 'グローバル',
     options: 'オプション', noReservations: '予約がありません',
-    showPast: '過去の予約を含む',
+    showPast: '過去の予約を含む', showCancelled: 'キャンセルを含む',
     driver: 'ドライバー', drivers: 'ドライバー管理',
     addDriver: 'ドライバー追加', driverName: '名前', driverPhone: '電話番号',
     driverVehicles: '運転可能車両', noDriver: '未配車', unassigned: '未配車',
@@ -352,7 +352,7 @@ var LANG = {
     sync: '동기화', settings: '설정', noData: '데이터 없음',
     marketKorea: '한국', marketAsia: '아시아', marketGlobal: '글로벌',
     options: '옵션', noReservations: '예약이 없습니다',
-    showPast: '지난 예약 포함',
+    showPast: '지난 예약 포함', showCancelled: '취소 포함',
     driver: '드라이버', drivers: '드라이버 관리',
     addDriver: '드라이버 추가', driverName: '이름', driverPhone: '전화번호',
     driverVehicles: '운전 가능 차량', noDriver: '미배차', unassigned: '미배차',
@@ -410,7 +410,7 @@ var LANG = {
     sync: 'Sync', settings: 'Settings', noData: 'No data',
     marketKorea: 'Korea', marketAsia: 'Asia', marketGlobal: 'Global',
     options: 'Options', noReservations: 'No reservations',
-    showPast: 'Include past bookings',
+    showPast: 'Include past bookings', showCancelled: 'Include cancelled',
     driver: 'Driver', drivers: 'Driver Management',
     addDriver: 'Add Driver', driverName: 'Name', driverPhone: 'Phone',
     driverVehicles: 'Vehicles', noDriver: 'Unassigned', unassigned: 'Unassigned',
@@ -435,6 +435,7 @@ var calMonth = new Date().getMonth();
 var searchQ = '';
 var filterOtaId = '';
 var showPastRes = false;
+var showCancelled = false;
 var statsMonth = '';
 var chartInstances = [];
 var syncInterval = null;
@@ -1239,6 +1240,7 @@ function renderResTab() {
   h += '<button class="vt-btn' + (resView==='cal'?' active':'') + '" onclick="setResView(\'cal\')">' + t('calView') + '</button>';
   h += '</div>';
   h += '<button class="btn btn-sm' + (showPastRes?' btn-accent':' btn-outline') + '" onclick="togglePastRes()">' + t('showPast') + '</button>';
+  h += '<button class="btn btn-sm' + (showCancelled?' btn-accent':' btn-outline') + '" onclick="toggleCancelled()">' + t('showCancelled') + '</button>';
   h += '<button class="btn btn-outline btn-sm" onclick="exportCsv()">' + t('csvExport') + '</button>';
   h += '<button class="btn btn-accent btn-sm" onclick="showResForm(null)">' + t('addReservation') + '</button>';
   h += '</div>';
@@ -1256,12 +1258,16 @@ function onSearch(v) { searchQ=v; renderResTab(); }
 function setFilter(id) { filterOtaId=id; renderResTab(); }
 function setResView(v) { resView=v; renderResTab(); }
 function togglePastRes() { showPastRes=!showPastRes; renderResTab(); }
+function toggleCancelled() { showCancelled=!showCancelled; renderResTab(); }
 
 function getFilteredRes() {
   var res = data.reservations || [];
   if(!showPastRes) {
     var td = todayStr();
     res = res.filter(function(r){ return (r.date||'') >= td; });
+  }
+  if(!showCancelled) {
+    res = res.filter(function(r){ return r.status !== 'cancelled'; });
   }
   if(filterOtaId) res = res.filter(function(r){return r.otaId===filterOtaId;});
   if(searchQ) {
@@ -1324,6 +1330,9 @@ function renderCalendar() {
   var daysInMonth = new Date(year, month+1, 0).getDate();
   var todayS = todayStr();
   var reservations = data.reservations || [];
+  if(!showCancelled) {
+    reservations = reservations.filter(function(r){ return r.status !== 'cancelled'; });
+  }
   var monthRes = reservations.filter(function(r){
     if(!r.date) return false;
     var parts = r.date.split('-');

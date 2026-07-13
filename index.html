@@ -104,6 +104,15 @@ tr.clickable{cursor:pointer;transition:background .15s}
 tr.clickable:hover{background:var(--accent-bg)}
 tr.past-res{opacity:.45}
 tr.cancelled-res td{background:#FEF2F2;color:#991B1B}
+tr.sent-res td{background:#ECFDF5}
+tr.sent-res.cancelled-res td{background:#FEF2F2;color:#991B1B}
+.sent-btn{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s}
+.sent-btn:hover{border-color:var(--st-confirmed)}
+.sent-btn.done{background:var(--st-confirmed);color:#fff;border-color:var(--st-confirmed)}
+.copy-btn{border:none;background:none;cursor:pointer;color:var(--text2);padding:2px 4px;font-size:11px;border-radius:4px;opacity:.5;transition:all .15s;vertical-align:middle}
+.copy-btn:hover{opacity:1;background:var(--accent-bg);color:var(--accent)}
+.cell-copy{display:inline-flex;align-items:center;gap:2px;max-width:100%}
+.cell-copy .cell-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* === STATUS BADGES === */
 .status-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;display:inline-block}
@@ -295,6 +304,7 @@ var LANG = {
     marketKorea: '韓国', marketAsia: 'アジア', marketGlobal: 'グローバル',
     options: 'オプション', noReservations: '予約がありません',
     showPast: '過去の予約を含む', showCancelled: 'キャンセルを含む',
+    sentCol: '送信', sent: '送信済', notSent: '未送信',
     driver: 'ドライバー', drivers: 'ドライバー管理',
     addDriver: 'ドライバー追加', driverName: '名前', driverPhone: '電話番号',
     driverVehicles: '運転可能車両', noDriver: '未配車', unassigned: '未配車',
@@ -353,6 +363,7 @@ var LANG = {
     marketKorea: '한국', marketAsia: '아시아', marketGlobal: '글로벌',
     options: '옵션', noReservations: '예약이 없습니다',
     showPast: '지난 예약 포함', showCancelled: '취소 포함',
+    sentCol: '전송', sent: '전송됨', notSent: '미전송',
     driver: '드라이버', drivers: '드라이버 관리',
     addDriver: '드라이버 추가', driverName: '이름', driverPhone: '전화번호',
     driverVehicles: '운전 가능 차량', noDriver: '미배차', unassigned: '미배차',
@@ -411,6 +422,7 @@ var LANG = {
     marketKorea: 'Korea', marketAsia: 'Asia', marketGlobal: 'Global',
     options: 'Options', noReservations: 'No reservations',
     showPast: 'Include past bookings', showCancelled: 'Include cancelled',
+    sentCol: 'Sent', sent: 'Sent', notSent: 'Not sent',
     driver: 'Driver', drivers: 'Driver Management',
     addDriver: 'Add Driver', driverName: 'Name', driverPhone: 'Phone',
     driverVehicles: 'Vehicles', noDriver: 'Unassigned', unassigned: 'Unassigned',
@@ -1286,7 +1298,7 @@ function renderResList() {
   var res = getFilteredRes();
   var todayS = todayStr();
   var h = '<div class="table-wrap"><table>';
-  h += '<colgroup><col style="width:8%"><col style="width:11%"><col style="width:13%"><col style="width:17%"><col style="width:9%"><col style="width:6%"><col style="width:10%"><col style="width:12%"><col style="width:8%"></colgroup>';
+  h += '<colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:16%"><col style="width:8%"><col style="width:6%"><col style="width:9%"><col style="width:11%"><col style="width:8%"><col style="width:7%"></colgroup>';
   h += '<thead><tr>';
   h += '<th>' + t('ota') + '</th>';
   h += '<th>' + t('bookingNo') + '</th>';
@@ -1297,17 +1309,19 @@ function renderResList() {
   h += '<th>' + t('vehicle') + '</th>';
   h += '<th>' + t('driver') + '</th>';
   h += '<th>' + t('status') + '</th>';
+  h += '<th>' + t('sentCol') + '</th>';
   h += '</tr></thead><tbody>';
   if(res.length===0) {
-    h += '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text2)">' + t('noReservations') + '</td></tr>';
+    h += '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text2)">' + t('noReservations') + '</td></tr>';
   }
   res.forEach(function(r){
     var isPast = r.date < todayS;
     var isCancelled = r.status === 'cancelled';
-    h += '<tr class="clickable' + (isPast?' past-res':'') + (isCancelled?' cancelled-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
+    var isSent = r.driverSent ? true : false;
+    h += '<tr class="clickable' + (isPast?' past-res':'') + (isCancelled?' cancelled-res':'') + (isSent?' sent-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
     h += '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + getOtaColor(r.otaId) + ';margin-right:6px"></span>' + escHtml(getOtaName(r.otaId)) + '</td>';
-    h += '<td>' + escHtml(r.bookingNo) + '</td>';
-    h += '<td>' + escHtml(r.guest);
+    h += '<td><span class="cell-copy"><span class="cell-text">' + escHtml(r.bookingNo) + '</span>' + copyBtn(r.bookingNo) + '</span></td>';
+    h += '<td><span class="cell-copy"><span class="cell-text">' + escHtml(r.guest) + '</span>' + copyBtn(r.guest) + '</span>';
     h += '</td>';
     h += '<td>' + escHtml(r.tour) + '</td>';
     h += '<td>' + escHtml(r.date) + '</td>';
@@ -1316,10 +1330,47 @@ function renderResList() {
     var dn = r.driver || '';
     h += '<td>' + (dn ? escHtml(dn) : '<span style="color:var(--text2);font-size:11px">' + t('unassigned') + '</span>') + '</td>';
     h += '<td><span class="status-badge st-' + r.status + '">' + getStatusText(r.status) + '</span></td>';
+    h += '<td><button class="sent-btn' + (isSent?' done':'') + '" onclick="event.stopPropagation();toggleDriverSent(\'' + r.id + '\')">' + (isSent?t('sent'):t('notSent')) + '</button></td>';
     h += '</tr>';
   });
   h += '</tbody></table></div>';
   return h;
+}
+
+function copyBtn(text) {
+  var safe = (text||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return '<button class="copy-btn" title="Copy" onclick="event.stopPropagation();copyText(\'' + safe + '\',this)">⧉</button>';
+}
+
+function copyText(text, btn) {
+  function done() {
+    if(btn){ var old = btn.textContent; btn.textContent='✓'; setTimeout(function(){ btn.textContent=old; }, 1000); }
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function(){ fallbackCopy(text); done(); });
+  } else {
+    fallbackCopy(text); done();
+  }
+}
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+function toggleDriverSent(resId) {
+  for(var i=0;i<res.length;i++){
+    if(res[i].id===resId){
+      res[i].driverSent = !res[i].driverSent;
+      saveData();
+      sbUpsertReservation(res[i]);
+      break;
+    }
+  }
+  renderMain();
 }
 
 /* ===== CALENDAR VIEW ===== */
@@ -1898,7 +1949,8 @@ function resToRow(r) {
     status: r.status || 'confirmed',
     notes: r.notes || '',
     driver: r.driver || '',
-    driver_phone: r.driverPhone || ''
+    driver_phone: r.driverPhone || '',
+    driver_sent: r.driverSent ? true : false
   };
 }
 
@@ -1922,7 +1974,8 @@ function rowToRes(row) {
     status: row.status || 'confirmed',
     notes: row.notes || '',
     driver: row.driver || '',
-    driverPhone: row.driver_phone || ''
+    driverPhone: row.driver_phone || '',
+    driverSent: row.driver_sent ? true : false
   };
 }
 

@@ -1363,6 +1363,7 @@ function fallbackCopy(text) {
 }
 
 function toggleDriverSent(resId) {
+  var res = data.reservations || [];
   for(var i=0;i<res.length;i++){
     if(res[i].id===resId){
       res[i].driverSent = !res[i].driverSent;

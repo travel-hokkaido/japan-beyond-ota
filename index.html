@@ -100,6 +100,7 @@ body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-seri
 table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
 th{background:var(--bg);padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis}
 td{padding:10px 12px;border-bottom:1px solid var(--border-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+td.nowrap-cell{overflow:visible;text-overflow:clip}
 tr.clickable{cursor:pointer;transition:background .15s}
 tr.clickable:hover{background:var(--accent-bg)}
 tr.past-res{opacity:.45}
@@ -1298,7 +1299,7 @@ function renderResList() {
   var res = getFilteredRes();
   var todayS = todayStr();
   var h = '<div class="table-wrap"><table>';
-  h += '<colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:16%"><col style="width:8%"><col style="width:6%"><col style="width:9%"><col style="width:11%"><col style="width:8%"><col style="width:7%"></colgroup>';
+  h += '<colgroup><col style="width:8%"><col style="width:10%"><col style="width:12%"><col style="width:16%"><col style="width:10%"><col style="width:7%"><col style="width:9%"><col style="width:8%"><col style="width:8%"><col style="width:7%"></colgroup>';
   h += '<thead><tr>';
   h += '<th>' + t('ota') + '</th>';
   h += '<th>' + t('bookingNo') + '</th>';
@@ -1324,8 +1325,8 @@ function renderResList() {
     h += '<td><span class="cell-copy"><span class="cell-text">' + escHtml(r.guest) + '</span>' + copyBtn(r.guest) + '</span>';
     h += '</td>';
     h += '<td>' + escHtml(r.tour) + '</td>';
-    h += '<td>' + escHtml(r.date) + '</td>';
-    h += '<td>' + escHtml(r.pickupTime || '') + '</td>';
+    h += '<td class="nowrap-cell">' + escHtml(r.date) + '</td>';
+    h += '<td class="nowrap-cell">' + escHtml(r.pickupTime || '') + '</td>';
     h += '<td>' + escHtml(r.vehicle) + '</td>';
     var dn = r.driver || '';
     h += '<td>' + (dn ? escHtml(dn) : '<span style="color:var(--text2);font-size:11px">' + t('unassigned') + '</span>') + '</td>';

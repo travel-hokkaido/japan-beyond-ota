@@ -2094,6 +2094,15 @@ function doSync() {
   });
 }
 
+/* Extract party composition and options from booking notes to enrich product/option display */
+/* 각 사이트의 getBookings가 product/option을 채워 보내면 그대로 사용.
+   비어있을 때만 인원수로 최소 보완 (업종 무관, 범용). */
+function enrichBooking(product, option, notes, pax) {
+  var prod = product || '';
+  if(!prod && pax) prod = pax + '名';
+  return { product: prod, option: option || '' };
+}
+
 /* Pull reservations from each OTA's booking API (auto-import) and upsert to Supabase.
    Expected API response: JSON array of bookings, each with fields:
    bookingNo, guest, email, phone, date, time, product, option, pax, price, status, notes */
@@ -2115,6 +2124,10 @@ function importFromApis(onDone) {
           var pd = b.date || b.preferred_date || '';
           var d = pd.indexOf('T')>=0 ? pd.slice(0,10) : pd;
           var tm = b.time || (pd.indexOf('T')>=0 ? pd.slice(11,16) : '');
+          var notes = b.notes || b.special_requests || '';
+          var product = b.product || b.tour || b.course || '';
+          var option = b.option || b.vehicle || '';
+          var enriched = enrichBooking(product, option, notes, parseInt(b.pax || b.guests) || 0);
           var r = {
             id: o.id + '_' + bno,
             otaId: o.id,
@@ -2124,13 +2137,13 @@ function importFromApis(onDone) {
             phone: b.phone || '',
             date: d,
             pickupTime: tm,
-            tour: b.product || b.tour || b.course || '',
-            vehicle: b.option || b.vehicle || '',
+            tour: enriched.product,
+            vehicle: enriched.option,
             pax: parseInt(b.pax || b.guests) || 0,
             price: parseInt(b.price || b.total_amount) || 0,
             carSeat: 0, pickup: b.pickup||'', dropoff: b.dropoff||'',
             status: st,
-            notes: b.notes || b.special_requests || '',
+            notes: notes,
             driver: '', driverPhone: '', driverSent: false
           };
           sbUpsertReservation(r);

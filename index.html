@@ -267,7 +267,7 @@ var LANG = {
     addOtaSite: 'OTAサイト追加', edit: '編集', del: '削除',
     save: '保存', cancel: 'キャンセル', close: '閉じる', confirmDel: '本当に削除しますか？',
     siteName: 'サイト名', commissionRate: '手数料率(%)',
-    marketTarget: '対象市場', siteUrl: 'サイトURL',
+    marketTarget: '対象市場', siteUrl: 'サイトURL', apiUrl: '予約API URL (自動取込)',
     loginId: 'ログインID', password: 'パスワード',
     emailDomain: 'メールドメイン', colorSelect: 'カラー選択',
     accountInfo: 'アカウント情報', showPw: '表示', hidePw: '非表示',
@@ -281,7 +281,7 @@ var LANG = {
     listView: 'リスト', calView: 'カレンダー',
     csvExport: 'CSV出力', addReservation: '予約追加',
     ota: 'OTA', bookingNo: '予約番号', guest: 'ゲスト',
-    tour: 'ツアー', date: '日付', vehicle: '車両', status: '状態',
+    tour: '商品', date: '日付', vehicle: 'オプション', status: '状態',
     confirmed: '確定', pending: '保留', cancelled: 'キャンセル', completed: '完了',
     priceField: '料金(¥)', pax: '人数', carSeat: 'チャイルドシート',
     pickup: 'ピックアップ', dropoff: 'ドロップオフ',
@@ -295,8 +295,8 @@ var LANG = {
     totalRevenue: '総売上', netRevenue: '実収入額',
     commissionAmt: '手数料額', totalGuests: '総人員',
     chartResByOta: 'OTA別予約', chartRevByOta: 'OTA別売上',
-    chartByStatus: '予約状態', chartRevByTour: 'ツアー別売上',
-    chartResByTour: 'ツアー別予約', chartMonthly: '月別売上推移',
+    chartByStatus: '予約状態', chartRevByTour: '商品別売上',
+    chartResByTour: '商品別予約', chartMonthly: '月別売上推移',
     syncSettings: '同期設定', webAppUrl: 'Web App URL',
     saveUrl: 'URL保存', manualImport: '手動インポート',
     importJson: 'JSONインポート', pasteJson: 'JSONを貼り付けてください',
@@ -326,7 +326,7 @@ var LANG = {
     addOtaSite: 'OTA 사이트 추가', edit: '수정', del: '삭제',
     save: '저장', cancel: '취소', close: '닫기', confirmDel: '정말 삭제하시겠습니까?',
     siteName: '사이트명', commissionRate: '수수료율(%)',
-    marketTarget: '대상 시장', siteUrl: '사이트 URL',
+    marketTarget: '대상 시장', siteUrl: '사이트 URL', apiUrl: '예약 API URL (자동 수집)',
     loginId: '로그인 ID', password: '비밀번호',
     emailDomain: '이메일 도메인', colorSelect: '색상 선택',
     accountInfo: '계정 정보', showPw: '표시', hidePw: '숨김',
@@ -340,7 +340,7 @@ var LANG = {
     listView: '리스트', calView: '캘린더',
     csvExport: 'CSV 내보내기', addReservation: '예약 추가',
     ota: 'OTA', bookingNo: '예약번호', guest: '게스트',
-    tour: '투어', date: '날짜', vehicle: '차량', status: '상태',
+    tour: '상품', date: '날짜', vehicle: '옵션', status: '상태',
     confirmed: '확정', pending: '보류', cancelled: '취소', completed: '완료',
     priceField: '가격(¥)', pax: '인원', carSeat: '카시트',
     pickup: '픽업', dropoff: '드롭',
@@ -354,8 +354,8 @@ var LANG = {
     totalRevenue: '총 매출', netRevenue: '실수령액',
     commissionAmt: '수수료 금액', totalGuests: '총 인원',
     chartResByOta: 'OTA별 예약', chartRevByOta: 'OTA별 매출',
-    chartByStatus: '예약 상태', chartRevByTour: '투어별 매출',
-    chartResByTour: '투어별 예약', chartMonthly: '월별 매출 추이',
+    chartByStatus: '예약 상태', chartRevByTour: '상품별 매출',
+    chartResByTour: '상품별 예약', chartMonthly: '월별 매출 추이',
     syncSettings: '동기화 설정', webAppUrl: 'Web App URL',
     saveUrl: 'URL 저장', manualImport: '수동 가져오기',
     importJson: 'JSON 가져오기', pasteJson: 'JSON을 붙여넣으세요',
@@ -385,7 +385,7 @@ var LANG = {
     addOtaSite: 'Add OTA Site', edit: 'Edit', del: 'Delete',
     save: 'Save', cancel: 'Cancel', close: 'Close', confirmDel: 'Are you sure you want to delete?',
     siteName: 'Site Name', commissionRate: 'Commission (%)',
-    marketTarget: 'Target Market', siteUrl: 'Site URL',
+    marketTarget: 'Target Market', siteUrl: 'Site URL', apiUrl: 'Booking API URL (auto-import)',
     loginId: 'Login ID', password: 'Password',
     emailDomain: 'Email Domain', colorSelect: 'Color',
     accountInfo: 'Account Info', showPw: 'Show', hidePw: 'Hide',
@@ -399,7 +399,7 @@ var LANG = {
     listView: 'List', calView: 'Calendar',
     csvExport: 'CSV Export', addReservation: 'Add Booking',
     ota: 'OTA', bookingNo: 'Booking No.', guest: 'Guest',
-    tour: 'Tour', date: 'Date', vehicle: 'Vehicle', status: 'Status',
+    tour: 'Product', date: 'Date', vehicle: 'Option', status: 'Status',
     confirmed: 'Confirmed', pending: 'Pending', cancelled: 'Cancelled', completed: 'Completed',
     priceField: 'Price (¥)', pax: 'Guests', carSeat: 'Car Seat',
     pickup: 'Pickup', dropoff: 'Drop-off',
@@ -413,8 +413,8 @@ var LANG = {
     totalRevenue: 'Total Revenue', netRevenue: 'Net Revenue',
     commissionAmt: 'Commission', totalGuests: 'Total Guests',
     chartResByOta: 'Bookings by OTA', chartRevByOta: 'Revenue by OTA',
-    chartByStatus: 'Booking Status', chartRevByTour: 'Revenue by Tour',
-    chartResByTour: 'Bookings by Tour', chartMonthly: 'Monthly Revenue',
+    chartByStatus: 'Booking Status', chartRevByTour: 'Revenue by Product',
+    chartResByTour: 'Bookings by Product', chartMonthly: 'Monthly Revenue',
     syncSettings: 'Sync Settings', webAppUrl: 'Web App URL',
     saveUrl: 'Save URL', manualImport: 'Manual Import',
     importJson: 'Import JSON', pasteJson: 'Paste JSON here',
@@ -959,7 +959,7 @@ function showProductForm(otaId, productId) {
   h += '<div class="modal-body">';
   h += '<form onsubmit="saveProduct(event,\'' + otaId + '\',\'' + (productId||'') + '\')">';
   h += '<div class="product-form-top">';
-  h += formGroup(t('productName'), '<input id="pf-name" value="' + escHtml(p?p.name:'') + '" required placeholder="Tour name">');
+  h += formGroup(t('productName'), '<input id="pf-name" value="' + escHtml(p?p.name:'') + '" required placeholder="' + t('productName') + '">');
   var commVal = p && p.commission !== undefined ? p.commission : (o ? o.commission : 20);
   h += formGroup(t('productCommission'), '<input id="pf-commission" type="number" value="' + commVal + '" min="0" max="100">');
   h += '</div>';
@@ -1146,6 +1146,7 @@ function showOtaForm(otaId) {
   h += formGroup(t('marketTarget'), '<input id="of-market" value="' + escHtml(o?o.market:'') + '" placeholder="Korea, Asia, Global...">');
   h += '</div>';
   h += formGroup(t('siteUrl'), '<input id="of-url" value="' + escHtml(o?o.url:'') + '" placeholder="https://">');
+  h += formGroup(t('apiUrl'), '<input id="of-apiurl" value="' + escHtml(o?o.apiUrl:'') + '" placeholder="https://...supabase.co/functions/v1/...">');
   h += '<div class="form-row">';
   h += formGroup(t('loginId'), '<input id="of-lid" value="' + escHtml(o?o.loginId:'') + '">');
   h += formGroup(t('password'), '<input id="of-pw" type="password" value="' + escHtml(o?o.password:'') + '">');
@@ -1176,6 +1177,7 @@ function saveOta(e, otaId) {
   var comm = parseInt(document.getElementById('of-comm').value)||0;
   var market = document.getElementById('of-market').value.trim();
   var url = document.getElementById('of-url').value.trim();
+  var apiUrl = document.getElementById('of-apiurl').value.trim();
   var lid = document.getElementById('of-lid').value.trim();
   var pw = document.getElementById('of-pw').value;
   var em = document.getElementById('of-email').value.trim();
@@ -1183,14 +1185,14 @@ function saveOta(e, otaId) {
   if(otaId) {
     var o = getOta(otaId);
     if(o){
-      o.name=name; o.commission=comm; o.market=market; o.url=url;
+      o.name=name; o.commission=comm; o.market=market; o.url=url; o.apiUrl=apiUrl;
       o.loginId=lid; o.password=pw; o.emailDomain=em; o.color=color;
       sbUpsertOta(o);
     }
   } else {
     var newId = name.toLowerCase().replace(/[^a-z0-9]/g,'') + Date.now().toString(36);
     var newOta = {
-      id:newId, name:name, commission:comm, market:market, url:url,
+      id:newId, name:name, commission:comm, market:market, url:url, apiUrl:apiUrl,
       loginId:lid, password:pw, emailDomain:em, color:color, products:[]
     };
     data.otas.push(newOta);
@@ -1991,6 +1993,7 @@ function otaToRow(o) {
     login_id: o.loginId || '',
     password: o.password || '',
     email_domain: o.emailDomain || '',
+    api_url: o.apiUrl || '',
     color: o.color || '#888',
     products: o.products || []
   };
@@ -2006,6 +2009,7 @@ function rowToOta(row) {
     loginId: row.login_id || '',
     password: row.password || '',
     emailDomain: row.email_domain || '',
+    apiUrl: row.api_url || '',
     color: row.color || '#888',
     products: row.products || []
   };
@@ -2082,9 +2086,58 @@ function sbDeleteOta(id) {
 function doSync() {
   syncConnected = false;
   renderHeader();
-  fetchAll(function(ok, err){
-    if(ok) { renderAll(); }
-    else { showPopup('Sync failed: ' + (err ? err.message : '')); }
+  importFromApis(function(){
+    fetchAll(function(ok, err){
+      if(ok) { renderAll(); }
+      else { showPopup('Sync failed: ' + (err ? err.message : '')); }
+    });
+  });
+}
+
+/* Pull reservations from each OTA's booking API (auto-import) and upsert to Supabase.
+   Expected API response: JSON array of bookings, each with fields:
+   bookingNo, guest, email, phone, date, time, product, option, pax, price, status, notes */
+function importFromApis(onDone) {
+  var otas = (data.otas || []).filter(function(o){ return o.apiUrl && o.apiUrl.indexOf('http') === 0; });
+  if(otas.length === 0) { if(onDone) onDone(); return; }
+  var pending = otas.length;
+  function finish() { pending--; if(pending<=0 && onDone) onDone(); }
+  otas.forEach(function(o){
+    fetch(o.apiUrl, {redirect:'follow'})
+      .then(function(r){ return r.json(); })
+      .then(function(json){
+        var list = Array.isArray(json) ? json : (json.reservations || json.bookings || []);
+        list.forEach(function(b){
+          var bno = b.bookingNo || b.booking_no || b.id || '';
+          if(!bno) return;
+          var stMap = {pending:'pending', seat_pending:'pending', confirmed:'confirmed', cancelled:'cancelled', canceled:'cancelled', completed:'completed'};
+          var st = stMap[(b.status||'').toLowerCase()] || 'confirmed';
+          var pd = b.date || b.preferred_date || '';
+          var d = pd.indexOf('T')>=0 ? pd.slice(0,10) : pd;
+          var tm = b.time || (pd.indexOf('T')>=0 ? pd.slice(11,16) : '');
+          var r = {
+            id: o.id + '_' + bno,
+            otaId: o.id,
+            bookingNo: bno,
+            guest: b.guest || b.name || '',
+            email: b.email || '',
+            phone: b.phone || '',
+            date: d,
+            pickupTime: tm,
+            tour: b.product || b.tour || b.course || '',
+            vehicle: b.option || b.vehicle || '',
+            pax: parseInt(b.pax || b.guests) || 0,
+            price: parseInt(b.price || b.total_amount) || 0,
+            carSeat: 0, pickup: b.pickup||'', dropoff: b.dropoff||'',
+            status: st,
+            notes: b.notes || b.special_requests || '',
+            driver: '', driverPhone: '', driverSent: false
+          };
+          sbUpsertReservation(r);
+        });
+        finish();
+      })
+      .catch(function(){ finish(); });
   });
 }
 

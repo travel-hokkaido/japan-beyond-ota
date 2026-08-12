@@ -2116,6 +2116,7 @@ function importFromApis(onDone) {
       .then(function(r){ return r.json(); })
       .then(function(json){
         var list = Array.isArray(json) ? json : (json.reservations || json.bookings || []);
+        var seenIds = {};
         list.forEach(function(b){
           var bno = b.bookingNo || b.booking_no || b.id || '';
           if(!bno) return;
@@ -2128,8 +2129,10 @@ function importFromApis(onDone) {
           var product = b.product || b.tour || b.course || '';
           var option = b.option || b.vehicle || '';
           var enriched = enrichBooking(product, option, notes, parseInt(b.pax || b.guests) || 0);
+          var rid = o.id + '_' + bno;
+          seenIds[rid] = true;
           var r = {
-            id: o.id + '_' + bno,
+            id: rid,
             otaId: o.id,
             bookingNo: bno,
             guest: b.guest || b.name || '',
@@ -2148,9 +2151,24 @@ function importFromApis(onDone) {
           };
           sbUpsertReservation(r);
         });
+        // API에서 사라진 예약 삭제 (이 OTA의 예약만, id 접두사로 식별)
+        removeStaleApiReservations(o.id, seenIds);
         finish();
       })
       .catch(function(){ finish(); });
+  });
+}
+
+/* API에서 사라진 예약을 Supabase에서 삭제.
+   이 OTA(otaId)에 속하고 id가 "otaId_"로 시작하는(=API 유입) 예약 중,
+   이번 응답(seenIds)에 없는 것만 삭제. 수동 입력 예약은 id 형식이 달라 영향 없음. */
+function removeStaleApiReservations(otaId, seenIds) {
+  var prefix = otaId + '_';
+  var res = data.reservations || [];
+  res.forEach(function(r){
+    if(r.otaId === otaId && r.id && r.id.indexOf(prefix) === 0 && !seenIds[r.id]) {
+      sbDeleteReservation(r.id);
+    }
   });
 }
 

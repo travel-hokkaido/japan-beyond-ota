@@ -267,7 +267,7 @@ var LANG = {
     addOtaSite: 'OTAサイト追加', edit: '編集', del: '削除',
     save: '保存', cancel: 'キャンセル', close: '閉じる', confirmDel: '本当に削除しますか？',
     siteName: 'サイト名', commissionRate: '手数料率(%)',
-    marketTarget: '対象市場', siteUrl: 'サイトURL', apiUrl: '予約API URL (自動取込)',
+    marketTarget: '対象市場', siteUrl: 'サイトURL', apiUrl: '予約API URL (自動取込)', apiKey: 'APIキー',
     loginId: 'ログインID', password: 'パスワード',
     emailDomain: 'メールドメイン', colorSelect: 'カラー選択',
     accountInfo: 'アカウント情報', showPw: '表示', hidePw: '非表示',
@@ -326,7 +326,7 @@ var LANG = {
     addOtaSite: 'OTA 사이트 추가', edit: '수정', del: '삭제',
     save: '저장', cancel: '취소', close: '닫기', confirmDel: '정말 삭제하시겠습니까?',
     siteName: '사이트명', commissionRate: '수수료율(%)',
-    marketTarget: '대상 시장', siteUrl: '사이트 URL', apiUrl: '예약 API URL (자동 수집)',
+    marketTarget: '대상 시장', siteUrl: '사이트 URL', apiUrl: '예약 API URL (자동 수집)', apiKey: 'API 키',
     loginId: '로그인 ID', password: '비밀번호',
     emailDomain: '이메일 도메인', colorSelect: '색상 선택',
     accountInfo: '계정 정보', showPw: '표시', hidePw: '숨김',
@@ -385,7 +385,7 @@ var LANG = {
     addOtaSite: 'Add OTA Site', edit: 'Edit', del: 'Delete',
     save: 'Save', cancel: 'Cancel', close: 'Close', confirmDel: 'Are you sure you want to delete?',
     siteName: 'Site Name', commissionRate: 'Commission (%)',
-    marketTarget: 'Target Market', siteUrl: 'Site URL', apiUrl: 'Booking API URL (auto-import)',
+    marketTarget: 'Target Market', siteUrl: 'Site URL', apiUrl: 'Booking API URL (auto-import)', apiKey: 'API Key',
     loginId: 'Login ID', password: 'Password',
     emailDomain: 'Email Domain', colorSelect: 'Color',
     accountInfo: 'Account Info', showPw: 'Show', hidePw: 'Hide',
@@ -1147,6 +1147,7 @@ function showOtaForm(otaId) {
   h += '</div>';
   h += formGroup(t('siteUrl'), '<input id="of-url" value="' + escHtml(o?o.url:'') + '" placeholder="https://">');
   h += formGroup(t('apiUrl'), '<input id="of-apiurl" value="' + escHtml(o?o.apiUrl:'') + '" placeholder="https://...supabase.co/functions/v1/...">');
+  h += formGroup(t('apiKey'), '<input id="of-apikey" value="' + escHtml(o?o.apiKey:'') + '" placeholder="비밀 키 (선택)">');
   h += '<div class="form-row">';
   h += formGroup(t('loginId'), '<input id="of-lid" value="' + escHtml(o?o.loginId:'') + '">');
   h += formGroup(t('password'), '<input id="of-pw" type="password" value="' + escHtml(o?o.password:'') + '">');
@@ -1178,6 +1179,7 @@ function saveOta(e, otaId) {
   var market = document.getElementById('of-market').value.trim();
   var url = document.getElementById('of-url').value.trim();
   var apiUrl = document.getElementById('of-apiurl').value.trim();
+  var apiKey = document.getElementById('of-apikey').value.trim();
   var lid = document.getElementById('of-lid').value.trim();
   var pw = document.getElementById('of-pw').value;
   var em = document.getElementById('of-email').value.trim();
@@ -1185,14 +1187,14 @@ function saveOta(e, otaId) {
   if(otaId) {
     var o = getOta(otaId);
     if(o){
-      o.name=name; o.commission=comm; o.market=market; o.url=url; o.apiUrl=apiUrl;
+      o.name=name; o.commission=comm; o.market=market; o.url=url; o.apiUrl=apiUrl; o.apiKey=apiKey;
       o.loginId=lid; o.password=pw; o.emailDomain=em; o.color=color;
       sbUpsertOta(o);
     }
   } else {
     var newId = name.toLowerCase().replace(/[^a-z0-9]/g,'') + Date.now().toString(36);
     var newOta = {
-      id:newId, name:name, commission:comm, market:market, url:url, apiUrl:apiUrl,
+      id:newId, name:name, commission:comm, market:market, url:url, apiUrl:apiUrl, apiKey:apiKey,
       loginId:lid, password:pw, emailDomain:em, color:color, products:[]
     };
     data.otas.push(newOta);
@@ -1994,6 +1996,7 @@ function otaToRow(o) {
     password: o.password || '',
     email_domain: o.emailDomain || '',
     api_url: o.apiUrl || '',
+    api_key: o.apiKey || '',
     color: o.color || '#888',
     products: o.products || []
   };
@@ -2010,6 +2013,7 @@ function rowToOta(row) {
     password: row.password || '',
     emailDomain: row.email_domain || '',
     apiUrl: row.api_url || '',
+    apiKey: row.api_key || '',
     color: row.color || '#888',
     products: row.products || []
   };
@@ -2112,7 +2116,13 @@ function importFromApis(onDone) {
   var pending = otas.length;
   function finish() { pending--; if(pending<=0 && onDone) onDone(); }
   otas.forEach(function(o){
-    fetch(o.apiUrl, {redirect:'follow'})
+    var fetchUrl = o.apiUrl;
+    var opts = {redirect:'follow'};
+    if(o.apiKey) {
+      fetchUrl += (o.apiUrl.indexOf('?')>=0 ? '&' : '?') + 'key=' + encodeURIComponent(o.apiKey);
+      opts.headers = {'x-api-key': o.apiKey};
+    }
+    fetch(fetchUrl, opts)
       .then(function(r){ return r.json(); })
       .then(function(json){
         var list = Array.isArray(json) ? json : (json.reservations || json.bookings || []);

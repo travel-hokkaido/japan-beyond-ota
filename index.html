@@ -1552,12 +1552,15 @@ function saveRes(e, resId) {
     for(var i=0;i<data.reservations.length;i++){
       if(data.reservations[i].id===resId){
         obj.id = resId;
+        obj.driverSent = data.reservations[i].driverSent || false;
+        obj.edited = true;
         data.reservations[i] = obj;
         break;
       }
     }
   } else {
     obj.id = genId();
+    obj.edited = true;
     data.reservations.push(obj);
   }
   saveData();
@@ -1956,7 +1959,8 @@ function resToRow(r) {
     notes: r.notes || '',
     driver: r.driver || '',
     driver_phone: r.driverPhone || '',
-    driver_sent: r.driverSent ? true : false
+    driver_sent: r.driverSent ? true : false,
+    edited: r.edited ? true : false
   };
 }
 
@@ -1981,7 +1985,8 @@ function rowToRes(row) {
     notes: row.notes || '',
     driver: row.driver || '',
     driverPhone: row.driver_phone || '',
-    driverSent: row.driver_sent ? true : false
+    driverSent: row.driver_sent ? true : false,
+    edited: row.edited ? true : false
   };
 }
 
@@ -2113,6 +2118,9 @@ function enrichBooking(product, option, notes, pax) {
 function importFromApis(onDone) {
   var otas = (data.otas || []).filter(function(o){ return o.apiUrl && o.apiUrl.indexOf('http') === 0; });
   if(otas.length === 0) { if(onDone) onDone(); return; }
+  // 대시보드에서 수정한 예약 id 목록 (API가 덮어쓰지 않도록 보호)
+  var editedIds = {};
+  (data.reservations || []).forEach(function(r){ if(r.edited) editedIds[r.id] = true; });
   var pending = otas.length;
   function finish() { pending--; if(pending<=0 && onDone) onDone(); }
   otas.forEach(function(o){
@@ -2130,6 +2138,10 @@ function importFromApis(onDone) {
         list.forEach(function(b){
           var bno = b.bookingNo || b.booking_no || b.id || '';
           if(!bno) return;
+          var rid = o.id + '_' + bno;
+          seenIds[rid] = true;
+          // 대시보드에서 수정한 예약은 API 데이터로 덮어쓰지 않음
+          if(editedIds[rid]) return;
           var stMap = {pending:'pending', seat_pending:'pending', confirmed:'confirmed', cancelled:'cancelled', canceled:'cancelled', completed:'completed'};
           var st = stMap[(b.status||'').toLowerCase()] || 'confirmed';
           var pd = b.date || b.preferred_date || '';
@@ -2139,8 +2151,6 @@ function importFromApis(onDone) {
           var product = b.product || b.tour || b.course || '';
           var option = b.option || b.vehicle || '';
           var enriched = enrichBooking(product, option, notes, parseInt(b.pax || b.guests) || 0);
-          var rid = o.id + '_' + bno;
-          seenIds[rid] = true;
           var r = {
             id: rid,
             otaId: o.id,
@@ -2161,8 +2171,8 @@ function importFromApis(onDone) {
           };
           sbUpsertReservation(r);
         });
-        // API에서 사라진 예약 삭제 (이 OTA의 예약만, id 접두사로 식별)
-        removeStaleApiReservations(o.id, seenIds);
+        // API에서 사라진 예약 삭제 (이 OTA의 예약만, 수정된 예약은 보존)
+        removeStaleApiReservations(o.id, seenIds, editedIds);
         finish();
       })
       .catch(function(){ finish(); });
@@ -2172,11 +2182,12 @@ function importFromApis(onDone) {
 /* API에서 사라진 예약을 Supabase에서 삭제.
    이 OTA(otaId)에 속하고 id가 "otaId_"로 시작하는(=API 유입) 예약 중,
    이번 응답(seenIds)에 없는 것만 삭제. 수동 입력 예약은 id 형식이 달라 영향 없음. */
-function removeStaleApiReservations(otaId, seenIds) {
+function removeStaleApiReservations(otaId, seenIds, editedIds) {
+  editedIds = editedIds || {};
   var prefix = otaId + '_';
   var res = data.reservations || [];
   res.forEach(function(r){
-    if(r.otaId === otaId && r.id && r.id.indexOf(prefix) === 0 && !seenIds[r.id]) {
+    if(r.otaId === otaId && r.id && r.id.indexOf(prefix) === 0 && !seenIds[r.id] && !editedIds[r.id]) {
       sbDeleteReservation(r.id);
     }
   });

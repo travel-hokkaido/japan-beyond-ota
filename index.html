@@ -2069,6 +2069,28 @@ function sbUpsertReservation(r) {
   });
 }
 
+/* API 유입 예약 반영: 없으면 생성, 있으면 edited가 아닌 행만 갱신 (DB 조건으로 판단하므로 오래된 캐시/동시 수정에도 안전) */
+function sbUpsertApiReservation(r) {
+  var row = resToRow(r);
+  return fetch(SUPABASE_URL + '/rest/v1/reservations?on_conflict=id', {
+    method: 'POST',
+    headers: sbHeaders({'Prefer': 'resolution=ignore-duplicates'}),
+    body: JSON.stringify(row)
+  }).then(function(){
+    var patch = {
+      ota_id: row.ota_id, booking_no: row.booking_no, guest: row.guest, tour: row.tour,
+      date: row.date, pickup_time: row.pickup_time, vehicle: row.vehicle, price: row.price,
+      pax: row.pax, car_seat: row.car_seat, pickup: row.pickup, dropoff: row.dropoff,
+      email: row.email, phone: row.phone, status: row.status, notes: row.notes
+    };
+    return fetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(edited.is.false,edited.is.null)', {
+      method: 'PATCH',
+      headers: sbHeaders(),
+      body: JSON.stringify(patch)
+    });
+  });
+}
+
 /* delete a single reservation */
 function sbDeleteReservation(id) {
   var url = SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(id);
@@ -2140,7 +2162,6 @@ function importFromApis(onDone) {
           if(!bno) return;
           var rid = o.id + '_' + bno;
           seenIds[rid] = true;
-          // 대시보드에서 수정한 예약은 API 데이터로 덮어쓰지 않음
           if(editedIds[rid]) return;
           var stMap = {pending:'pending', seat_pending:'pending', confirmed:'confirmed', cancelled:'cancelled', canceled:'cancelled', completed:'completed'};
           var st = stMap[(b.status||'').toLowerCase()] || 'confirmed';
@@ -2169,7 +2190,7 @@ function importFromApis(onDone) {
             notes: notes,
             driver: '', driverPhone: '', driverSent: false
           };
-          sbUpsertReservation(r);
+          sbUpsertApiReservation(r);
         });
         // API에서 사라진 예약 삭제 (이 OTA의 예약만, 수정된 예약은 보존)
         removeStaleApiReservations(o.id, seenIds, editedIds);
@@ -2188,7 +2209,7 @@ function removeStaleApiReservations(otaId, seenIds, editedIds) {
   var res = data.reservations || [];
   res.forEach(function(r){
     if(r.otaId === otaId && r.id && r.id.indexOf(prefix) === 0 && !seenIds[r.id] && !editedIds[r.id]) {
-      sbDeleteReservation(r.id);
+      fetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(edited.is.false,edited.is.null)', {method: 'DELETE', headers: sbHeaders()});
     }
   });
 }

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Japan Beyond OTA</title>
-<script src="https://artifactcdn.diabrowser.engineering/ajax/libs/Chart.js/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -107,6 +107,13 @@ tr.past-res{opacity:.45}
 tr.cancelled-res td{background:#FEF2F2;color:#991B1B}
 tr.sent-res td{background:#ECFDF5}
 tr.sent-res.cancelled-res td{background:#FEF2F2;color:#991B1B}
+tr.nodate-res td{background:#FFFBEB}
+.date-warn{color:#92400E;font-size:11px;font-weight:600}
+.diag-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:auto}
+.diag-table th,.diag-table td{padding:6px 8px;border-bottom:1px solid var(--border-light);text-align:left;white-space:normal}
+.diag-warn{background:#FFFBEB;border:1px solid #FFE082;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#92400E}
+.diag-ok{background:#ECFDF5;border:1px solid #A7F3D0;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#065F46}
+.diag-h{font-size:13px;font-weight:600;margin:14px 0 8px}
 .sent-btn{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s}
 .sent-btn:hover{border-color:var(--st-confirmed)}
 .sent-btn.done{background:var(--st-confirmed);color:#fff;border-color:var(--st-confirmed)}
@@ -314,7 +321,12 @@ var LANG = {
     priceInputMode: '入力金額', allMonths: '全期間', monthFilter: '月別',
     geminiKey: 'Gemini API Key', pasteEmail: 'メール貼り付け',
     parseEmail: 'メールから予約登録', parsing: '解析中...',
-    emailPlaceholder: '予約確認メールの本文を貼り付けてください'
+    emailPlaceholder: '予約確認メールの本文を貼り付けてください',
+    dateUnknown: '日付未確認', unknownOta: '未登録OTA', saveFailed: '保存に失敗しました。通信状態を確認して再度保存してください',
+    diagTitle: 'データ診断', diagLoaded: '読み込んだ予約数', diagLastSync: '最終同期', diagLastError: '最終エラー',
+    diagByOta: 'OTA別予約数', diagUnknownOta: '登録されていないOTA IDの予約があります。OTAのIDを確認してください',
+    diagBadDate: '日付が読み取れない予約', diagRecent: '最近メールから取り込んだ予約', diagAllOk: '問題は見つかりませんでした',
+    diagNone: 'なし', diagApi: 'API取込結果'
   },
   ko: {
     appTitle: 'Japan Beyond', appSub: 'OTA 예약 관리',
@@ -373,7 +385,12 @@ var LANG = {
     priceInputMode: '입력 금액', allMonths: '전체 기간', monthFilter: '월별',
     geminiKey: 'Gemini API Key', pasteEmail: '메일 붙여넣기',
     parseEmail: '메일에서 예약 등록', parsing: '분석 중...',
-    emailPlaceholder: '예약 확인 메일 본문을 붙여넣으세요'
+    emailPlaceholder: '예약 확인 메일 본문을 붙여넣으세요',
+    dateUnknown: '날짜 미확인', unknownOta: '미등록 OTA', saveFailed: '저장에 실패했습니다. 연결 상태를 확인하고 다시 저장하세요',
+    diagTitle: '데이터 진단', diagLoaded: '불러온 예약 수', diagLastSync: '마지막 동기화', diagLastError: '마지막 오류',
+    diagByOta: 'OTA별 예약 수', diagUnknownOta: '등록되지 않은 OTA ID의 예약이 있습니다. OTA ID를 확인하세요',
+    diagBadDate: '날짜를 읽을 수 없는 예약', diagRecent: '최근 메일로 들어온 예약', diagAllOk: '문제가 발견되지 않았습니다',
+    diagNone: '없음', diagApi: 'API 가져오기 결과'
   },
   en: {
     appTitle: 'Japan Beyond', appSub: 'OTA Booking Manager',
@@ -432,7 +449,12 @@ var LANG = {
     priceInputMode: 'Price input', allMonths: 'All time', monthFilter: 'Month',
     geminiKey: 'Gemini API Key', pasteEmail: 'Paste Email',
     parseEmail: 'Register from Email', parsing: 'Parsing...',
-    emailPlaceholder: 'Paste the booking confirmation email here'
+    emailPlaceholder: 'Paste the booking confirmation email here',
+    dateUnknown: 'Date unknown', unknownOta: 'Unregistered OTA', saveFailed: 'Save failed. Check your connection and save again',
+    diagTitle: 'Data check', diagLoaded: 'Reservations loaded', diagLastSync: 'Last sync', diagLastError: 'Last error',
+    diagByOta: 'Reservations by OTA', diagUnknownOta: 'Some reservations use an OTA ID that is not registered. Check the OTA IDs',
+    diagBadDate: 'Reservations with unreadable dates', diagRecent: 'Latest reservations from email', diagAllOk: 'No problems found',
+    diagNone: 'None', diagApi: 'API import results'
   }
 };
 
@@ -455,37 +477,21 @@ var syncInterval = null;
 var syncConnected = false;
 var localDirty = false;
 var deletedBookingNos = [];
+var pendingWrites = 0;
+var fetchInFlight = false;
+var lastSyncAt = '';
+var lastSyncError = '';
+var apiImportLog = {};
+var priceFixDone = {};
+var pollCount = 0;
+var renderDeferred = false;
 
 var OTA_COLORS = ['#4A90D9','#FF6B35','#2D9B4E','#9B59B6','#E74C3C','#1ABC9C','#F39C12','#34495E'];
 
 /* ===== DEFAULT DATA ===== */
 function getDefaultData() {
-  return {
-    drivers: [],
-    otas: [
-      { id:'myrealtrip', name:'MyRealTrip', commission:20, market:'korea',
-        url:'https://www.myrealtrip.com', loginId:'japanbeyond', password:'pw1234',
-        emailDomain:'myrealtrip.com', color:'#4A90D9', products:[] },
-      { id:'klook', name:'Klook', commission:20, market:'asia',
-        url:'https://www.klook.com', loginId:'japanbeyond', password:'pw1234',
-        emailDomain:'klook.com', color:'#FF6B35', products:[
-          { id:'p1', name:'Furano & Biei Private Tour', url:'', status:'published',
-            options:[{name:'ALPHARD',price:85000},{name:'HIACE',price:120000},{name:'Micro Bus',price:180000}]},
-          { id:'p2', name:'Sapporo One-Day Private Tour', url:'', status:'published',
-            options:[{name:'ALPHARD',price:55000},{name:'HIACE',price:75000},{name:'Micro Bus',price:110000}]},
-          { id:'p3', name:'Takino & Shikotsu & Noboribetsu Tour', url:'', status:'published',
-            options:[{name:'ALPHARD',price:80000},{name:'HIACE',price:110000},{name:'Micro Bus',price:170000}]},
-          { id:'p4', name:'Lake Toya & Noboribetsu Tour', url:'', status:'published',
-            options:[{name:'ALPHARD',price:90000},{name:'HIACE',price:130000},{name:'Micro Bus',price:190000}]},
-          { id:'p5', name:'Shakotan & Otaru Tour', url:'', status:'published',
-            options:[{name:'ALPHARD',price:70000},{name:'HIACE',price:95000},{name:'Micro Bus',price:150000}]}
-        ]},
-      { id:'viator', name:'Viator', commission:20, market:'global',
-        url:'https://www.viator.com', loginId:'japanbeyond', password:'pw1234',
-        emailDomain:'viator.com', color:'#2D9B4E', products:[] }
-    ],
-    reservations: []
-  };
+  /* OTA와 예약은 Supabase가 원본. 가짜 기본 OTA(id가 DB와 다름)를 만들지 않는다 */
+  return { drivers: [], otas: [], reservations: [] };
 }
 
 /* ===== DATA LOAD / SAVE ===== */
@@ -520,7 +526,7 @@ function getOta(id) {
   for (var i=0;i<otas.length;i++) { if(otas[i].id===id) return otas[i]; }
   return null;
 }
-function getOtaName(id) { var o=getOta(id); return o?o.name:id; }
+function getOtaName(id) { var o=getOta(id); return o?o.name:(id ? id + ' (' + t('unknownOta') + ')' : t('unknownOta')); }
 function getOtaColor(id) { var o=getOta(id); return o?o.color:'#888'; }
 function getOtaCommission(id) { var o=getOta(id); return o?o.commission:0; }
 
@@ -554,6 +560,35 @@ function getDriverName(driver) {
 
 function normOpt(s) {
   return (s||'').toLowerCase().replace(/\s+/g,'').replace(/[（）]/g,function(m){return m==='（'?'(':')';}).replace(/[~〜～]/g,'~');
+}
+
+var MONTHS_EN = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12};
+
+/* 여러 형식의 날짜를 YYYY-MM-DD로 통일. 읽을 수 없으면 '' */
+function normDate(v) {
+  var s = (v === null || v === undefined) ? '' : String(v).trim();
+  if(!s) return '';
+  var m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m) return validYmd(+m[1], +m[2], +m[3]);
+  m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if(m) return validYmd(+m[1], +m[2], +m[3]);
+  m = s.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if(m) return validYmd(+m[1], +m[2], +m[3]);
+  m = s.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/);
+  if(m && MONTHS_EN[m[1].toLowerCase().substr(0,4)] ) return validYmd(+m[3], MONTHS_EN[m[1].toLowerCase().substr(0,4)], +m[2]);
+  if(m && MONTHS_EN[m[1].toLowerCase().substr(0,3)]) return validYmd(+m[3], MONTHS_EN[m[1].toLowerCase().substr(0,3)], +m[2]);
+  m = s.match(/(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})/);
+  if(m && MONTHS_EN[m[2].toLowerCase().substr(0,3)]) return validYmd(+m[3], MONTHS_EN[m[2].toLowerCase().substr(0,3)], +m[1]);
+  return '';
+}
+function validYmd(y, mo, d) {
+  if(!y || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return y + '-' + pad(mo) + '-' + pad(d);
+}
+function normStatus(v) {
+  var s = (v || '').toString().trim().toLowerCase();
+  var map = {confirmed:'confirmed', pending:'pending', seat_pending:'pending', cancelled:'cancelled', canceled:'cancelled', completed:'completed'};
+  return map[s] || (s ? s : 'confirmed');
 }
 
 function matchProductPrice(otaId, tourName, vehicle) {
@@ -1248,7 +1283,10 @@ function renderResTab() {
   h += '<select class="lang-select" onchange="setFilter(this.value)">';
   h += '<option value="">' + t('allOtas') + '</option>';
   otas.forEach(function(o){
-    h += '<option value="' + o.id + '"' + (filterOtaId===o.id?' selected':'') + '>' + escHtml(o.name) + '</option>';
+    h += '<option value="' + escHtml(o.id) + '"' + (filterOtaId===o.id?' selected':'') + '>' + escHtml(o.name) + '</option>';
+  });
+  getUnknownOtaIds().forEach(function(uid){
+    h += '<option value="' + escHtml(uid) + '"' + (filterOtaId===uid?' selected':'') + '>' + escHtml(getOtaName(uid)) + '</option>';
   });
   h += '</select>';
   h += '<div style="flex:1"></div>';
@@ -1271,6 +1309,15 @@ function renderResTab() {
   document.getElementById('mainArea').innerHTML = h;
 }
 
+function getUnknownOtaIds() {
+  var seen = {};
+  var out = [];
+  (data.reservations || []).forEach(function(r){
+    if(!getOta(r.otaId) && !seen[r.otaId]) { seen[r.otaId] = true; out.push(r.otaId); }
+  });
+  return out;
+}
+
 function onSearch(v) { searchQ=v; renderResTab(); }
 function setFilter(id) { filterOtaId=id; renderResTab(); }
 function setResView(v) { resView=v; renderResTab(); }
@@ -1281,7 +1328,8 @@ function getFilteredRes() {
   var res = data.reservations || [];
   if(!showPastRes) {
     var td = todayStr();
-    res = res.filter(function(r){ return (r.date||'') >= td; });
+    /* 날짜를 읽지 못한 예약은 "지난 예약"으로 숨기지 않고 항상 보여준다 (메일 파싱 누락 방지) */
+    res = res.filter(function(r){ return !r.date || r.date >= td; });
   }
   if(!showCancelled) {
     res = res.filter(function(r){ return r.status !== 'cancelled'; });
@@ -1295,7 +1343,11 @@ function getFilteredRes() {
              (r.tour||'').toLowerCase().indexOf(q)>=0;
     });
   }
-  res.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  res.sort(function(a,b){
+    if(!a.date && b.date) return -1;
+    if(a.date && !b.date) return 1;
+    return (a.date||'').localeCompare(b.date||'');
+  });
   return res;
 }
 
@@ -1320,16 +1372,18 @@ function renderResList() {
     h += '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text2)">' + t('noReservations') + '</td></tr>';
   }
   res.forEach(function(r){
-    var isPast = r.date < todayS;
+    var isPast = r.date ? r.date < todayS : false;
+    var noDate = !r.date;
     var isCancelled = r.status === 'cancelled';
     var isSent = r.driverSent ? true : false;
-    h += '<tr class="clickable' + (isPast?' past-res':'') + (isCancelled?' cancelled-res':'') + (isSent?' sent-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
+    h += '<tr class="clickable' + (isPast?' past-res':'') + (isCancelled?' cancelled-res':'') + (isSent?' sent-res':'') + (noDate?' nodate-res':'') + '" onclick="showResForm(\'' + r.id + '\')">';
     h += '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + getOtaColor(r.otaId) + ';margin-right:6px"></span>' + escHtml(getOtaName(r.otaId)) + '</td>';
     h += '<td><span class="cell-copy"><span class="cell-text">' + escHtml(r.bookingNo) + '</span>' + copyBtn(r.bookingNo) + '</span></td>';
     h += '<td><span class="cell-copy"><span class="cell-text">' + escHtml(r.guest) + '</span>' + copyBtn(r.guest) + '</span>';
     h += '</td>';
     h += '<td>' + escHtml(r.tour) + '</td>';
-    h += '<td class="nowrap-cell">' + escHtml(r.date) + '</td>';
+    if(noDate) h += '<td class="nowrap-cell" title="' + escHtml(r.rawDate || '') + '"><span class="date-warn">' + t('dateUnknown') + '</span></td>';
+    else h += '<td class="nowrap-cell">' + escHtml(r.date) + '</td>';
     h += '<td class="nowrap-cell">' + escHtml(r.pickupTime || '') + '</td>';
     h += '<td>' + escHtml(r.vehicle) + '</td>';
     var dn = r.driver || '';
@@ -1372,7 +1426,8 @@ function toggleDriverSent(resId) {
     if(res[i].id===resId){
       res[i].driverSent = !res[i].driverSent;
       saveData();
-      sbUpsertReservation(res[i]);
+      /* 발송 여부 한 칸만 갱신: 그 사이 메일로 들어온 취소 등 다른 변경을 덮지 않는다 */
+      sbPatchReservation(res[i].id, {driver_sent: res[i].driverSent});
       break;
     }
   }
@@ -1469,8 +1524,11 @@ function showResForm(resId) {
   h += '<form onsubmit="saveRes(event,\'' + (resId||'') + '\')">';
   var otaSelect = '<select id="rf-ota" onchange="onOtaChange()">';
   otas.forEach(function(o){
-    otaSelect += '<option value="' + o.id + '"' + (r&&r.otaId===o.id?' selected':'') + '>' + escHtml(o.name) + '</option>';
+    otaSelect += '<option value="' + escHtml(o.id) + '"' + (r&&r.otaId===o.id?' selected':'') + '>' + escHtml(o.name) + '</option>';
   });
+  if(r && !getOta(r.otaId)) {
+    otaSelect += '<option value="' + escHtml(r.otaId) + '" selected>' + escHtml(getOtaName(r.otaId)) + '</option>';
+  }
   otaSelect += '</select>';
   h += formGroup(t('ota'), otaSelect);
   h += '<div class="form-row">';
@@ -1480,11 +1538,11 @@ function showResForm(resId) {
   var tourVal = r ? r.tour : '';
   var vehicleVal = r ? r.vehicle : '';
   h += '<div class="form-row">';
-  h += formGroup(t('tour'), '<select id="rf-tour" onchange="onTourChange()"><option value="">' + tourVal + '</option></select>');
-  h += formGroup(t('vehicle'), '<select id="rf-vehicle" onchange="autoCalcPrice()"><option value="">' + vehicleVal + '</option></select>');
+  h += formGroup(t('tour'), '<select id="rf-tour" onchange="onTourChange()"><option value="">' + escHtml(tourVal) + '</option></select>');
+  h += formGroup(t('vehicle'), '<select id="rf-vehicle" onchange="autoCalcPrice()"><option value="">' + escHtml(vehicleVal) + '</option></select>');
   h += '</div>';
   h += '<div class="form-row">';
-  h += formGroup(t('date'), '<input id="rf-date" type="date" value="' + (r?r.date:'') + '" required>');
+  h += formGroup(t('date'), '<input id="rf-date" type="date" value="' + escHtml(r?r.date:'') + '" required>' + (r && !r.date && r.rawDate ? '<div class="date-warn" style="margin-top:4px">' + t('dateUnknown') + ': ' + escHtml(r.rawDate) + '</div>' : ''));
   h += formGroup(t('pickupTime'), '<input id="rf-pickupTime" type="time" value="' + escHtml(r?r.pickupTime:'') + '">');
   h += '</div>';
   h += '<div class="form-row">';
@@ -1664,16 +1722,32 @@ function populateTours(selectedVal) {
   var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
   var ota = getOta(otaId);
   var prods = ota ? (ota.products || []) : [];
+  var sv = (selectedVal || '').trim();
+  var found = false;
   var html = '<option value="">' + t('tour') + '...</option>';
   prods.forEach(function(p){
-    if(p.status === 'unpublished') return;
-    var selected = (selectedVal && (selectedVal === p.name || p.name.toLowerCase().indexOf(selectedVal.toLowerCase()) >= 0 || selectedVal.toLowerCase().indexOf(p.name.toLowerCase()) >= 0)) ? ' selected' : '';
-    html += '<option value="' + escHtml(p.name) + '"' + selected + '>' + escHtml(p.name) + '</option>';
+    if(p.status === 'unpublished' && p.name !== sv) return;
+    var isSel = sv && p.name === sv;
+    if(isSel) found = true;
+    html += '<option value="' + escHtml(p.name) + '"' + (isSel?' selected':'') + '>' + escHtml(p.name) + '</option>';
   });
-  if(selectedVal && sel.querySelector('option[selected]') === null) {
-    html += '<option value="' + escHtml(selectedVal) + '" selected>' + escHtml(selectedVal) + '</option>';
+  /* 메일/API로 들어온 상품명이 등록 상품과 정확히 같지 않아도 원래 값을 그대로 유지 (저장 시 사라지지 않게) */
+  if(sv && !found) {
+    html += '<option value="' + escHtml(sv) + '" selected>' + escHtml(sv) + '</option>';
   }
   sel.innerHTML = html;
+}
+
+function findProductForTour(prods, tourName) {
+  var tn = (tourName || '').trim().toLowerCase();
+  if(!tn) return null;
+  var i;
+  for(i=0;i<prods.length;i++){ if((prods[i].name||'').trim().toLowerCase() === tn) return prods[i]; }
+  for(i=0;i<prods.length;i++){
+    var pn = (prods[i].name||'').trim().toLowerCase();
+    if(pn.length>3 && tn.length>3 && (tn.indexOf(pn) >= 0 || pn.indexOf(tn) >= 0)) return prods[i];
+  }
+  return null;
 }
 
 function populateVehicles(tourName, selectedVal) {
@@ -1682,23 +1756,20 @@ function populateVehicles(tourName, selectedVal) {
   var otaId = document.getElementById('rf-ota') ? document.getElementById('rf-ota').value : '';
   var ota = getOta(otaId);
   var prods = ota ? (ota.products || []) : [];
-  var options = [];
-  var tn = (tourName || '').toLowerCase();
-  prods.forEach(function(p){
-    var pn = (p.name || '').toLowerCase();
-    if(tn && (tn === pn || tn.indexOf(pn) >= 0 || pn.indexOf(tn) >= 0)) {
-      options = p.options || [];
-    }
-  });
+  var prod = findProductForTour(prods, tourName);
+  var options = prod ? (prod.options || []) : [];
+  var sv = (selectedVal || '').trim();
+  var nsv = normOpt(sv);
+  var found = false;
   var html = '<option value="">' + t('vehicle') + '...</option>';
   options.forEach(function(op){
-    var sv = (selectedVal || '').toLowerCase();
-    var on = (op.name || '').toLowerCase();
-    var selected = (sv && (sv === on || sv.indexOf(on) >= 0 || on.indexOf(sv) >= 0)) ? ' selected' : '';
-    html += '<option value="' + escHtml(op.name) + '"' + selected + '>' + escHtml(op.name) + ' (' + fmtYen(op.price) + ')</option>';
+    var isSel = !found && sv && normOpt(op.name) === nsv;
+    if(isSel) found = true;
+    html += '<option value="' + escHtml(op.name) + '"' + (isSel?' selected':'') + '>' + escHtml(op.name) + ' (' + fmtYen(op.price) + ')</option>';
   });
-  if(selectedVal && options.length === 0) {
-    html += '<option value="' + escHtml(selectedVal) + '" selected>' + escHtml(selectedVal) + '</option>';
+  /* 등록 옵션과 일치하지 않는 옵션명도 유지 (예전에는 이 경우 저장하면 옵션이 지워졌다) */
+  if(sv && !found) {
+    html += '<option value="' + escHtml(sv) + '" selected>' + escHtml(sv) + '</option>';
   }
   sel.innerHTML = html;
 }
@@ -1716,26 +1787,20 @@ function onTourChange() {
 }
 
 /* ===== CSV EXPORT ===== */
+function csvCell(v) {
+  return '"' + String(v === null || v === undefined ? '' : v).replace(/"/g,'""') + '"';
+}
+
 function exportCsv() {
   var res = getFilteredRes();
   var headers = [t('ota'),t('bookingNo'),t('guest'),t('tour'),t('date'),t('vehicle'),t('priceField'),t('pax'),t('status'),t('pickup'),t('dropoff'),t('email'),t('phone'),t('notes')];
   var csvRows = [headers.join(',')];
   res.forEach(function(r){
     var row = [
-      '"'+getOtaName(r.otaId)+'"',
-      '"'+(r.bookingNo||'')+'"',
-      '"'+(r.guest||'')+'"',
-      '"'+(r.tour||'')+'"',
-      r.date||'',
-      '"'+(r.vehicle||'')+'"',
-      r.price||0,
-      r.pax||0,
-      '"'+getStatusText(r.status)+'"',
-      '"'+(r.pickup||'')+'"',
-      '"'+(r.dropoff||'')+'"',
-      '"'+(r.email||'')+'"',
-      '"'+(r.phone||'')+'"',
-      '"'+(r.notes||'').replace(/"/g,'""')+'"'
+      csvCell(getOtaName(r.otaId)), csvCell(r.bookingNo), csvCell(r.guest), csvCell(r.tour),
+      csvCell(r.date || r.rawDate), csvCell(r.vehicle), r.price||0, r.pax||0,
+      csvCell(getStatusText(r.status)), csvCell(r.pickup), csvCell(r.dropoff),
+      csvCell(r.email), csvCell(r.phone), csvCell(r.notes)
     ];
     csvRows.push(row.join(','));
   });
@@ -1919,6 +1984,7 @@ function renderCharts() {
 function createChart(canvasId, type, chartData, chartOptions) {
   var el = document.getElementById(canvasId);
   if(!el) return;
+  if(typeof Chart === 'undefined') return;
   var ctx = el.getContext('2d');
   var c = new Chart(ctx, {type:type, data:chartData, options:chartOptions});
   chartInstances.push(c);
@@ -1927,6 +1993,7 @@ function createChart(canvasId, type, chartData, chartOptions) {
 /* ===== SUPABASE SYNC ===== */
 var SUPABASE_URL = 'https://hiyzbijlumuwzchwccvd.supabase.co';
 var SUPABASE_KEY = 'sb_publishable_GQxj1BgyS4pYxHDQmEn6WA_BZZA_ZYR';
+var SB_PAGE = 1000;
 
 function sbHeaders(extra) {
   var h = {
@@ -1936,6 +2003,31 @@ function sbHeaders(extra) {
   };
   if(extra) { for(var k in extra) h[k] = extra[k]; }
   return h;
+}
+
+/* 모든 Supabase 요청은 여기를 거친다. HTTP 오류(401, 404, 500, 일시정지 등)를 성공으로 착각하지 않도록 status를 검사한다. */
+function sbFetch(url, opts) {
+  return fetch(url, opts || {}).then(function(r){
+    if(r.ok) return r;
+    return r.text().then(function(body){
+      var msg = 'HTTP ' + r.status + (body ? ': ' + body.substring(0, 200) : '');
+      throw new Error(msg);
+    });
+  });
+}
+
+/* 쓰기 요청 추적: 진행 중에는 폴링이 오래된 DB 값으로 화면을 되돌리지 않게 하고, 실패하면 사용자에게 알린다 */
+function trackWrite(promise, label) {
+  pendingWrites++;
+  return promise.then(function(r){
+    pendingWrites--;
+    return r;
+  }, function(err){
+    pendingWrites--;
+    lastSyncError = (label || 'write') + ' / ' + (err && err.message ? err.message : err);
+    showPopup(t('saveFailed') + ' (' + lastSyncError + ')');
+    return null;
+  });
 }
 
 function resToRow(r) {
@@ -1965,13 +2057,15 @@ function resToRow(r) {
 }
 
 function rowToRes(row) {
+  var rawDate = row.date === null || row.date === undefined ? '' : String(row.date);
   return {
     id: row.id,
     otaId: row.ota_id || '',
     bookingNo: row.booking_no || '',
     guest: row.guest || '',
     tour: row.tour || '',
-    date: row.date || '',
+    date: normDate(rawDate),
+    rawDate: rawDate,
     pickupTime: row.pickup_time || '',
     vehicle: row.vehicle || '',
     price: Number(row.price) || 0,
@@ -1981,7 +2075,7 @@ function rowToRes(row) {
     dropoff: row.dropoff || '',
     email: row.email || '',
     phone: row.phone || '',
-    status: row.status || 'confirmed',
+    status: normStatus(row.status),
     notes: row.notes || '',
     driver: row.driver || '',
     driverPhone: row.driver_phone || '',
@@ -1994,7 +2088,7 @@ function otaToRow(o) {
   return {
     id: o.id,
     name: o.name || '',
-    commission: o.commission || 20,
+    commission: (o.commission === 0 || o.commission) ? o.commission : 20,
     market: o.market || '',
     url: o.url || '',
     login_id: o.loginId || '',
@@ -2008,10 +2102,14 @@ function otaToRow(o) {
 }
 
 function rowToOta(row) {
+  var c = Number(row.commission);
+  var prods = row.products || [];
+  if(typeof prods === 'string') { try { prods = JSON.parse(prods); } catch(e) { prods = []; } }
+  if(!Array.isArray(prods)) prods = [];
   return {
     id: row.id,
     name: row.name || '',
-    commission: Number(row.commission) || 20,
+    commission: (row.commission === null || row.commission === undefined || row.commission === '' || isNaN(c)) ? 20 : c,
     market: row.market || '',
     url: row.url || '',
     loginId: row.login_id || '',
@@ -2020,61 +2118,93 @@ function rowToOta(row) {
     apiUrl: row.api_url || '',
     apiKey: row.api_key || '',
     color: row.color || '#888',
-    products: row.products || []
+    products: prods
   };
+}
+
+/* 테이블 전체를 페이지 단위로 읽는다.
+   Supabase(PostgREST)는 한 번에 최대 1000행만 돌려주므로, 예약이 1000건을 넘으면
+   그 뒤에 들어온 예약(최근 메일 예약)이 화면에서 사라지는 문제가 있었다. */
+function sbFetchAllRows(table) {
+  var rows = [];
+  function page(offset) {
+    var url = SUPABASE_URL + '/rest/v1/' + table + '?select=*&order=id.asc&limit=' + SB_PAGE + '&offset=' + offset;
+    return sbFetch(url, {headers: sbHeaders(), cache: 'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        if(!Array.isArray(list)) throw new Error(table + ': unexpected response');
+        rows = rows.concat(list);
+        if(list.length === 0) return rows;
+        return page(offset + list.length);
+      });
+  }
+  return page(0);
 }
 
 /* fetch all data from Supabase */
 function fetchAll(onDone) {
-  var resUrl = SUPABASE_URL + '/rest/v1/reservations?select=*';
-  var otaUrl = SUPABASE_URL + '/rest/v1/otas?select=*';
-  Promise.all([
-    fetch(resUrl, {headers: sbHeaders()}).then(function(r){ return r.json(); }),
-    fetch(otaUrl, {headers: sbHeaders()}).then(function(r){ return r.json(); })
-  ]).then(function(results){
+  Promise.all([sbFetchAllRows('reservations'), sbFetchAllRows('otas')])
+  .then(function(results){
     var resRows = results[0] || [];
     var otaRows = results[1] || [];
-    if(otaRows.length > 0) {
-      data.otas = otaRows.map(rowToOta);
-    }
+    data.otas = otaRows.map(rowToOta);
     data.reservations = resRows.map(rowToRes);
     if(!data.otas) data.otas = [];
     if(!data.reservations) data.reservations = [];
-    data.reservations.forEach(function(r){
-      if(!r.price || r.price === 0) {
-        var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
-        if(calc) {
-          r.price = calc.net;
-          sbUpsertReservation(r);
-        }
-      }
-    });
-    localStorage.setItem('jb-ota-data', JSON.stringify(data));
+    autoFillPrices();
+    try { localStorage.setItem('jb-ota-data', JSON.stringify(data)); } catch(e) {}
     syncConnected = true;
+    lastSyncAt = new Date().toLocaleString();
     if(onDone) onDone(true);
   }).catch(function(err){
     syncConnected = false;
+    lastSyncError = 'fetch / ' + (err && err.message ? err.message : err);
     renderHeader();
     if(onDone) onDone(false, err);
   });
 }
 
-/* upsert a single reservation */
+/* 가격 0인 예약에 상품 가격(수수료 차감) 반영.
+   price 한 칸만, 그리고 DB에서 아직 0일 때만 PATCH하므로 다른 필드(상태, 기사 등)를 덮지 않는다. */
+function autoFillPrices() {
+  (data.reservations || []).forEach(function(r){
+    if(r.price && r.price !== 0) return;
+    var calc = matchProductPrice(r.otaId, r.tour, r.vehicle);
+    if(!calc) return;
+    r.price = calc.net;
+    if(priceFixDone[r.id]) return;
+    priceFixDone[r.id] = true;
+    fetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(price.eq.0,price.is.null)', {
+      method: 'PATCH', headers: sbHeaders(), body: JSON.stringify({price: calc.net})
+    }).catch(function(){ priceFixDone[r.id] = false; });
+  });
+}
+
+/* upsert a single reservation (대시보드에서 직접 저장할 때) */
 function sbUpsertReservation(r) {
   var url = SUPABASE_URL + '/rest/v1/reservations?on_conflict=id';
-  return fetch(url, {
+  return trackWrite(sbFetch(url, {
     method: 'POST',
-    headers: sbHeaders({'Prefer': 'resolution=merge-duplicates'}),
+    headers: sbHeaders({'Prefer': 'resolution=merge-duplicates,return=minimal'}),
     body: JSON.stringify(resToRow(r))
-  });
+  }), 'save ' + (r.bookingNo || r.id));
+}
+
+/* 예약의 일부 필드만 갱신 (다른 사람/자동 동기화가 바꾼 칸을 오래된 값으로 덮지 않기 위해) */
+function sbPatchReservation(id, fields) {
+  return trackWrite(sbFetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: sbHeaders({'Prefer': 'return=minimal'}),
+    body: JSON.stringify(fields)
+  }), 'update ' + id);
 }
 
 /* API 유입 예약 반영: 없으면 생성, 있으면 edited가 아닌 행만 갱신 (DB 조건으로 판단하므로 오래된 캐시/동시 수정에도 안전) */
 function sbUpsertApiReservation(r) {
   var row = resToRow(r);
-  return fetch(SUPABASE_URL + '/rest/v1/reservations?on_conflict=id', {
+  return sbFetch(SUPABASE_URL + '/rest/v1/reservations?on_conflict=id', {
     method: 'POST',
-    headers: sbHeaders({'Prefer': 'resolution=ignore-duplicates'}),
+    headers: sbHeaders({'Prefer': 'resolution=ignore-duplicates,return=minimal'}),
     body: JSON.stringify(row)
   }).then(function(){
     var patch = {
@@ -2083,9 +2213,9 @@ function sbUpsertApiReservation(r) {
       pax: row.pax, car_seat: row.car_seat, pickup: row.pickup, dropoff: row.dropoff,
       email: row.email, phone: row.phone, status: row.status, notes: row.notes
     };
-    return fetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(edited.is.false,edited.is.null)', {
+    return sbFetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(edited.is.false,edited.is.null)', {
       method: 'PATCH',
-      headers: sbHeaders(),
+      headers: sbHeaders({'Prefer': 'return=minimal'}),
       body: JSON.stringify(patch)
     });
   });
@@ -2094,38 +2224,40 @@ function sbUpsertApiReservation(r) {
 /* delete a single reservation */
 function sbDeleteReservation(id) {
   var url = SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(id);
-  return fetch(url, {method: 'DELETE', headers: sbHeaders()});
+  return trackWrite(sbFetch(url, {method: 'DELETE', headers: sbHeaders()}), 'delete ' + id);
 }
 
 /* upsert a single OTA */
 function sbUpsertOta(o) {
   var url = SUPABASE_URL + '/rest/v1/otas?on_conflict=id';
-  return fetch(url, {
+  return trackWrite(sbFetch(url, {
     method: 'POST',
-    headers: sbHeaders({'Prefer': 'resolution=merge-duplicates'}),
+    headers: sbHeaders({'Prefer': 'resolution=merge-duplicates,return=minimal'}),
     body: JSON.stringify(otaToRow(o))
-  });
+  }), 'save OTA ' + (o.name || o.id));
 }
 
 /* delete a single OTA */
 function sbDeleteOta(id) {
   var url = SUPABASE_URL + '/rest/v1/otas?id=eq.' + encodeURIComponent(id);
-  return fetch(url, {method: 'DELETE', headers: sbHeaders()});
+  return trackWrite(sbFetch(url, {method: 'DELETE', headers: sbHeaders()}), 'delete OTA ' + id);
 }
 
 /* manual sync button */
+/* 1) DB를 먼저 읽어 최신 OTA 목록(API URL 포함)을 확보 → 2) 직접판매 API 가져오기 → 3) 다시 읽기.
+   (예전에는 캐시가 비어 있으면 OTA 목록이 없어 API 가져오기가 건너뛰어졌다) */
 function doSync() {
   syncConnected = false;
   renderHeader();
-  importFromApis(function(){
-    fetchAll(function(ok, err){
-      if(ok) { renderAll(); }
-      else { showPopup('Sync failed: ' + (err ? err.message : '')); }
+  fetchAll(function(ok, err){
+    if(!ok) { showPopup('Sync failed: ' + (err ? err.message : '')); return; }
+    renderAll();
+    importFromApis(function(){
+      fetchAll(function(ok2){ if(ok2) renderAll(); });
     });
   });
 }
 
-/* Extract party composition and options from booking notes to enrich product/option display */
 /* 각 사이트의 getBookings가 product/option을 채워 보내면 그대로 사용.
    비어있을 때만 인원수로 최소 보완 (업종 무관, 범용). */
 function enrichBooking(product, option, notes, pax) {
@@ -2134,44 +2266,56 @@ function enrichBooking(product, option, notes, pax) {
   return { product: prod, option: option || '' };
 }
 
-/* Pull reservations from each OTA's booking API (auto-import) and upsert to Supabase.
-   Expected API response: JSON array of bookings, each with fields:
-   bookingNo, guest, email, phone, date, time, product, option, pax, price, status, notes */
+/* API 응답에서 예약 배열을 찾는다. 배열을 찾지 못하면 null (= 오류 응답으로 간주) */
+function extractBookingList(json) {
+  if(Array.isArray(json)) return json;
+  if(json && typeof json === 'object') {
+    var keys = ['reservations','bookings','data','items','results'];
+    for(var i=0;i<keys.length;i++){ if(Array.isArray(json[keys[i]])) return json[keys[i]]; }
+  }
+  return null;
+}
+
+/* Pull reservations from each OTA's booking API (auto-import) and upsert to Supabase. */
 function importFromApis(onDone) {
   var otas = (data.otas || []).filter(function(o){ return o.apiUrl && o.apiUrl.indexOf('http') === 0; });
   if(otas.length === 0) { if(onDone) onDone(); return; }
-  // 대시보드에서 수정한 예약 id 목록 (API가 덮어쓰지 않도록 보호)
   var editedIds = {};
   (data.reservations || []).forEach(function(r){ if(r.edited) editedIds[r.id] = true; });
-  var pending = otas.length;
-  function finish() { pending--; if(pending<=0 && onDone) onDone(); }
-  otas.forEach(function(o){
+  var jobs = otas.map(function(o){
     var fetchUrl = o.apiUrl;
-    var opts = {redirect:'follow'};
+    var opts = {redirect:'follow', cache:'no-store'};
     if(o.apiKey) {
       fetchUrl += (o.apiUrl.indexOf('?')>=0 ? '&' : '?') + 'key=' + encodeURIComponent(o.apiKey);
       opts.headers = {'x-api-key': o.apiKey};
     }
-    fetch(fetchUrl, opts)
-      .then(function(r){ return r.json(); })
+    return fetch(fetchUrl, opts)
+      .then(function(r){
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
       .then(function(json){
-        var list = Array.isArray(json) ? json : (json.reservations || json.bookings || []);
+        var list = extractBookingList(json);
+        /* 오류 응답({error:...})을 "예약 0건"으로 오해하면 기존 예약이 전부 삭제된다. 배열이 아니면 아무것도 지우지 않는다. */
+        if(list === null) throw new Error('not a booking list');
         var seenIds = {};
+        var writes = [];
         list.forEach(function(b){
-          var bno = b.bookingNo || b.booking_no || b.id || '';
+          if(!b || typeof b !== 'object') return;
+          var bno = String(b.bookingNo || b.booking_no || b.id || '');
           if(!bno) return;
           var rid = o.id + '_' + bno;
           seenIds[rid] = true;
           if(editedIds[rid]) return;
-          var stMap = {pending:'pending', seat_pending:'pending', confirmed:'confirmed', cancelled:'cancelled', canceled:'cancelled', completed:'completed'};
-          var st = stMap[(b.status||'').toLowerCase()] || 'confirmed';
-          var pd = b.date || b.preferred_date || '';
-          var d = pd.indexOf('T')>=0 ? pd.slice(0,10) : pd;
+          var st = normStatus(b.status);
+          var pd = String(b.date || b.preferred_date || '');
+          var d = normDate(pd) || pd;
           var tm = b.time || (pd.indexOf('T')>=0 ? pd.slice(11,16) : '');
           var notes = b.notes || b.special_requests || '';
           var product = b.product || b.tour || b.course || '';
           var option = b.option || b.vehicle || '';
-          var enriched = enrichBooking(product, option, notes, parseInt(b.pax || b.guests) || 0);
+          var paxN = parseInt(b.pax || b.guests) || 0;
+          var enriched = enrichBooking(product, option, notes, paxN);
           var r = {
             id: rid,
             otaId: o.id,
@@ -2183,21 +2327,29 @@ function importFromApis(onDone) {
             pickupTime: tm,
             tour: enriched.product,
             vehicle: enriched.option,
-            pax: parseInt(b.pax || b.guests) || 0,
+            pax: paxN,
             price: parseInt(b.price || b.total_amount) || 0,
             carSeat: 0, pickup: b.pickup||'', dropoff: b.dropoff||'',
             status: st,
             notes: notes,
             driver: '', driverPhone: '', driverSent: false
           };
-          sbUpsertApiReservation(r);
+          writes.push(sbUpsertApiReservation(r).then(function(){ return true; }, function(){ return false; }));
         });
-        // API에서 사라진 예약 삭제 (이 OTA의 예약만, 수정된 예약은 보존)
-        removeStaleApiReservations(o.id, seenIds, editedIds);
-        finish();
+        return Promise.all(writes).then(function(resArr){
+          var failed = resArr.filter(function(x){ return !x; }).length;
+          /* 빈 목록이거나 일부 저장이 실패한 경우에는 삭제하지 않는다 (안전 우선) */
+          var delWrites = (list.length > 0 && failed === 0) ? removeStaleApiReservations(o.id, seenIds, editedIds) : [];
+          return Promise.all(delWrites).then(function(){
+            apiImportLog[o.id] = {ok: failed === 0, count: list.length, failed: failed, at: new Date().toLocaleString(), msg: ''};
+          });
+        });
       })
-      .catch(function(){ finish(); });
+      .catch(function(err){
+        apiImportLog[o.id] = {ok: false, count: 0, failed: 0, at: new Date().toLocaleString(), msg: (err && err.message) ? err.message : String(err)};
+      });
   });
+  Promise.all(jobs).then(function(){ if(onDone) onDone(); });
 }
 
 /* API에서 사라진 예약을 Supabase에서 삭제.
@@ -2207,37 +2359,125 @@ function removeStaleApiReservations(otaId, seenIds, editedIds) {
   editedIds = editedIds || {};
   var prefix = otaId + '_';
   var res = data.reservations || [];
+  var out = [];
   res.forEach(function(r){
     if(r.otaId === otaId && r.id && r.id.indexOf(prefix) === 0 && !seenIds[r.id] && !editedIds[r.id]) {
-      fetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(edited.is.false,edited.is.null)', {method: 'DELETE', headers: sbHeaders()});
+      out.push(fetch(SUPABASE_URL + '/rest/v1/reservations?id=eq.' + encodeURIComponent(r.id) + '&or=(edited.is.false,edited.is.null)', {method: 'DELETE', headers: sbHeaders()}).catch(function(){}));
     }
   });
+  return out;
 }
 
+/* 설정 화면: 연결 정보 + 데이터 진단 (메일 예약이 안 보일 때 원인을 바로 확인) */
 function showSyncSettings() {
+  var res = data.reservations || [];
+  var otas = data.otas || [];
+  var known = {};
+  otas.forEach(function(o){ known[o.id] = o; });
+  var byOta = {};
+  var unknownIds = {};
+  var badDate = [];
+  res.forEach(function(r){
+    byOta[r.otaId] = (byOta[r.otaId] || 0) + 1;
+    if(!known[r.otaId]) unknownIds[r.otaId || '(empty)'] = (unknownIds[r.otaId || '(empty)'] || 0) + 1;
+    if(!r.date) badDate.push(r);
+  });
+  var emailRes = res.filter(function(r){ return (r.id || '').indexOf('email_') === 0; });
+  emailRes.sort(function(a,b){
+    var ta = parseInt((a.id.split('_')[1]) || '0'), tb = parseInt((b.id.split('_')[1]) || '0');
+    return tb - ta;
+  });
+
   var h = '';
   h += '<div class="modal-header"><h2>' + t('syncSettings') + '</h2>';
   h += '<button class="modal-close" onclick="closeModal()">&times;</button></div>';
   h += '<div class="modal-body">';
-  h += '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Supabase connected.</div>';
-  h += '<div style="font-size:12px;color:var(--text2);word-break:break-all;margin-bottom:20px">' + escHtml(SUPABASE_URL) + '</div>';
-  h += '<button class="btn btn-accent btn-sm" onclick="doSync();closeModal()">' + t('sync') + '</button>';
+  h += '<div style="font-size:13px;color:var(--text2);margin-bottom:6px">' + (syncConnected ? t('connected') : t('disconnected')) + ' / ' + escHtml(SUPABASE_URL) + '</div>';
+  h += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px">' + t('diagLastSync') + ': ' + escHtml(lastSyncAt || '-') + '</div>';
+  if(lastSyncError) h += '<div style="font-size:12px;color:#991B1B;margin-bottom:4px;word-break:break-all">' + t('diagLastError') + ': ' + escHtml(lastSyncError) + '</div>';
+  h += '<button class="btn btn-accent btn-sm" style="margin:10px 0 6px" onclick="doSync();closeModal()">' + t('sync') + '</button>';
+
+  h += '<div class="diag-h">' + t('diagTitle') + '</div>';
+  var hasUnknown = Object.keys(unknownIds).length > 0;
+  if(!hasUnknown && badDate.length === 0 && !lastSyncError) h += '<div class="diag-ok">' + t('diagAllOk') + '</div>';
+  if(hasUnknown) {
+    h += '<div class="diag-warn">' + t('diagUnknownOta') + ': ';
+    h += Object.keys(unknownIds).map(function(k){ return escHtml(k) + ' (' + unknownIds[k] + ')'; }).join(', ');
+    h += '</div>';
+  }
+  h += '<div style="font-size:12px;margin-bottom:8px">' + t('diagLoaded') + ': <strong>' + res.length + '</strong></div>';
+
+  h += '<div class="diag-h">' + t('diagByOta') + '</div>';
+  h += '<div class="table-wrap"><table class="diag-table"><thead><tr><th>ID</th><th>' + t('siteName') + '</th><th>' + t('reservations') + '</th><th>' + t('diagApi') + '</th></tr></thead><tbody>';
+  otas.forEach(function(o){
+    var log = apiImportLog[o.id];
+    var logTxt = '-';
+    if(o.apiUrl) logTxt = log ? ((log.ok ? 'OK ' + log.count : 'NG ' + escHtml(log.msg || ('failed ' + log.failed))) + ' / ' + escHtml(log.at)) : '-';
+    h += '<tr><td>' + escHtml(o.id) + '</td><td>' + escHtml(o.name) + '</td><td>' + (byOta[o.id] || 0) + '</td><td>' + logTxt + '</td></tr>';
+  });
+  Object.keys(unknownIds).forEach(function(k){
+    h += '<tr style="background:#FFFBEB"><td>' + escHtml(k) + '</td><td>' + t('unknownOta') + '</td><td>' + unknownIds[k] + '</td><td>-</td></tr>';
+  });
+  h += '</tbody></table></div>';
+
+  h += '<div class="diag-h">' + t('diagBadDate') + ' (' + badDate.length + ')</div>';
+  if(badDate.length === 0) h += '<div style="font-size:12px;color:var(--text2)">' + t('diagNone') + '</div>';
+  else {
+    h += '<div class="table-wrap"><table class="diag-table"><tbody>';
+    badDate.slice(0, 20).forEach(function(r){
+      h += '<tr class="clickable" onclick="showResForm(\'' + escHtml(r.id) + '\')"><td>' + escHtml(getOtaName(r.otaId)) + '</td><td>' + escHtml(r.bookingNo) + '</td><td>' + escHtml(r.guest) + '</td><td>' + escHtml(r.rawDate || '(empty)') + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  h += '<div class="diag-h">' + t('diagRecent') + '</div>';
+  if(emailRes.length === 0) h += '<div style="font-size:12px;color:var(--text2)">' + t('diagNone') + '</div>';
+  else {
+    h += '<div class="table-wrap"><table class="diag-table"><tbody>';
+    emailRes.slice(0, 10).forEach(function(r){
+      var ts = parseInt(r.id.split('_')[1] || '0');
+      var when = ts ? new Date(ts).toLocaleString() : '';
+      h += '<tr class="clickable" onclick="showResForm(\'' + escHtml(r.id) + '\')"><td>' + escHtml(when) + '</td><td>' + escHtml(getOtaName(r.otaId)) + '</td><td>' + escHtml(r.bookingNo) + '</td><td>' + escHtml(r.guest) + '</td><td>' + escHtml(r.date || r.rawDate) + '</td><td>' + getStatusText(r.status) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
   h += '</div>';
-  showModal(h, false);
+  showModal(h, true);
+}
+
+/* 사용자가 검색창 등에 입력 중이면 화면을 다시 그리지 않는다 (입력 끊김 방지) */
+function isUserTyping() {
+  var a = document.activeElement;
+  if(!a) return false;
+  var main = document.getElementById('mainArea');
+  return (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT') && main && main.contains(a);
 }
 
 function startPolling() {
   stopPolling();
-  syncInterval = setInterval(function(){
-    if(localDirty) return;
-    var oldHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
+  syncInterval = setInterval(pollOnce, 15000);
+}
+
+function pollOnce() {
+  if(localDirty || pendingWrites > 0 || fetchInFlight) return;
+  if(document.hidden) return;
+  pollCount++;
+  fetchInFlight = true;
+  var oldHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
+  function afterImport() {
     fetchAll(function(ok){
+      fetchInFlight = false;
       if(!ok) { renderHeader(); return; }
       var newHash = JSON.stringify(data.reservations || []) + JSON.stringify(data.otas || []);
-      if(newHash !== oldHash) renderAll();
-      else renderHeader();
+      if(newHash !== oldHash || renderDeferred) {
+        if(isUserTyping()) { renderDeferred = true; renderHeader(); }
+        else { renderDeferred = false; renderAll(); }
+      } else renderHeader();
     });
-  }, 15000);
+  }
+  /* 직접판매 사이트 API는 5분(20회)마다 자동으로 가져온다 */
+  if(pollCount % 20 === 0) importFromApis(afterImport);
+  else afterImport();
 }
 
 function stopPolling() {
